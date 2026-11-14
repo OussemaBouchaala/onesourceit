@@ -10,7 +10,9 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { whatsappLink } from "@/lib/format";
 
-export function SignInForm() {
+/** `admin` = back-office login: no sign-up or WhatsApp links, lands on /admin. */
+export function SignInForm({ variant = "reseller" }: { variant?: "reseller" | "admin" }) {
+  const admin = variant === "admin";
   const { signIn } = useAuthActions();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +26,7 @@ export function SignInForm() {
     setBusy(true);
     try {
       await signIn("password", form);
-      router.push("/compte");
+      router.push(admin ? "/admin" : "/compte");
       router.refresh();
     } catch {
       setError("Email ou mot de passe incorrect.");
@@ -37,15 +39,15 @@ export function SignInForm() {
       <form onSubmit={onSubmit} className="flex flex-col gap-5 rounded-[20px] border border-line bg-card p-[clamp(20px,5vw,32px)]">
         <Label>Email<Input name="email" type="email" required autoComplete="username" /></Label>
         <Label>Mot de passe<PasswordInput name="password" required autoComplete="current-password" /></Label>
-        <a href={whatsappLink("Bonjour, j'ai oublié le mot de passe de mon compte revendeur.")} target="_blank" rel="noopener noreferrer" className="self-end text-sm text-red-text">
+        {!admin && <a href={whatsappLink("Bonjour, j'ai oublié le mot de passe de mon compte revendeur.")} target="_blank" rel="noopener noreferrer" className="self-end text-sm text-red-text">
           Mot de passe oublié ?
-        </a>
+        </a>}
         {error && <p role="alert" className="m-0 rounded-xl bg-bad-soft px-3.5 py-3 text-sm font-medium text-bad-ink">{error}</p>}
         <Button type="submit" variant="secondary" size="lg" disabled={busy}>{busy ? "Connexion…" : "Se connecter"}</Button>
       </form>
-      <p className="m-0 text-center">
+      {!admin && <p className="m-0 text-center">
         Pas encore de compte ? <Link href="/inscription" className="font-semibold text-red-text">Créer un compte revendeur</Link>
-      </p>
+      </p>}
     </>
   );
 }

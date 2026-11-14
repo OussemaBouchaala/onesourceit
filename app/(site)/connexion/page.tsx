@@ -10,7 +10,7 @@ export default function SignInPage() {
         <h1 className="m-0 font-display text-[clamp(34px,9vw,44px)] leading-none font-bold uppercase">
           Se <em className="text-red-text">connecter</em>
         </h1>
-        <p className="m-0 text-soft">Espace revendeurs et administration.</p>
+        <p className="m-0 text-soft">Espace revendeurs.</p>
       </div>
       <SignInForm />
     </main>
