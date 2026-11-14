@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "convex/react";
+import { ChevronRight } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { formatDT } from "@/lib/format";
 
@@ -18,7 +19,7 @@ export function ProductList() {
           href={`/produit/${p.slug}`}
           className="flex flex-col gap-4 rounded-3xl border border-line bg-card p-5 text-ink no-underline hover:border-line-strong"
         >
-          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-[18px] bg-navy">
+          <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-[18px] bg-navy sm:aspect-square">
             {p.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={p.imageUrl} alt="" className="size-full object-cover" />
@@ -27,8 +28,9 @@ export function ProductList() {
             )}
           </div>
           <strong className="font-display text-xl">{p.name}</strong>
-          <span className="text-muted">
-            Prix détail <strong className="text-ink">{formatDT(p.retailPrice)}</strong>
+          <span className="flex items-center justify-between gap-3">
+            <span className="text-muted">Prix détail <strong className="text-ink">{formatDT(p.retailPrice)}</strong></span>
+            <span className="flex items-center gap-0.5 font-semibold text-red-text">Configurer<ChevronRight aria-hidden className="size-4" /></span>
           </span>
         </Link>
       ))}
