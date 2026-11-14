@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { whatsappLink } from "@/lib/format";
 
@@ -35,7 +36,7 @@ export function SignInForm() {
     <>
       <form onSubmit={onSubmit} className="flex flex-col gap-5 rounded-[20px] border border-line bg-card p-[clamp(20px,5vw,32px)]">
         <Label>Email<Input name="email" type="email" required autoComplete="username" /></Label>
-        <Label>Mot de passe<Input name="password" type="password" required autoComplete="current-password" /></Label>
+        <Label>Mot de passe<PasswordInput name="password" required autoComplete="current-password" /></Label>
         <a href={whatsappLink("Bonjour, j'ai oublié le mot de passe de mon compte revendeur.")} target="_blank" rel="noopener noreferrer" className="self-end text-sm text-red-text">
           Mot de passe oublié ?
         </a>

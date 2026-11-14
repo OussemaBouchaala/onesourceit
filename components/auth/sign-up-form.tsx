@@ -7,6 +7,7 @@ import { ConvexError } from "convex/values";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, NativeSelect } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { ACTIVITY_TYPES, GOVERNORATES } from "@/convex/rules";
 
@@ -102,8 +103,8 @@ export function SignUpForm() {
 
       <fieldset className={grid}>
         <legend className={legend}>Accès</legend>
-        <Label>Mot de passe<Input name="password" type="password" required minLength={8} autoComplete="new-password" /></Label>
-        <Label>Confirmer le mot de passe<Input name="passwordConfirm" type="password" required minLength={8} autoComplete="new-password" /></Label>
+        <Label>Mot de passe<PasswordInput name="password" required minLength={8} autoComplete="new-password" /></Label>
+        <Label>Confirmer le mot de passe<PasswordInput name="passwordConfirm" required minLength={8} autoComplete="new-password" /></Label>
       </fieldset>
 
       <label className="flex items-start gap-3 text-[15px]">
