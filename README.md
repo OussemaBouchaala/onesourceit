@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ONEsource IT — PoC
 
-## Getting Started
+Rebuild of onesourceit.shop for review by the client: product configurator,
+retail and wholesale prices, reseller sign-up with admin approval, cart with
+cash-on-delivery checkout, admin area with bulk photo and CSV import.
 
-First, run the development server:
+Stack: Next.js 16 (App Router, TypeScript, Tailwind 4, shadcn/ui components),
+Convex (database, auth, file storage), deployed on Vercel.
+
+## Run locally
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npx convex dev            # first run: log in, create the project, writes .env.local
+npx @convex-dev/auth      # one-time: sets JWT_PRIVATE_KEY, JWKS and SITE_URL on Convex
+npx convex run seed:run   # demo catalog (3 brands, 13 models, 5 colors)
+npm run dev               # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Create the first admin: sign up on `/inscription`, then
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npx convex run seed:makeAdmin '{"email":"you@example.com"}'
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploy (Vercel)
 
-## Learn More
+1. Import the GitHub repo in Vercel.
+2. In Convex, Settings → Deploy keys → create a production deploy key.
+   Add it in Vercel as `CONVEX_DEPLOY_KEY`.
+3. Override the Vercel build command:
+   `npx convex deploy --cmd 'npm run build'`
+4. Add `NEXT_PUBLIC_WHATSAPP_NUMBER` (e.g. `21621050742`).
+5. On the production Convex deployment, run `npx @convex-dev/auth --prod`
+   and set `SITE_URL` to the Vercel domain.
 
-To learn more about Next.js, take a look at the following resources:
+## Where the rules live
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Rule | Where |
+| --- | --- |
+| Wholesale price never sent to non-approved visitors | `convex/lib.ts` → `wholesalePriceFor`, the only reader of `reseller_prices` |
+| Order prices recalculated on the server | `convex/orders.ts` → `placeOrder` |
+| Approved resellers: min 10 per model, steps of 5 | `convex/rules.ts`, checked in `placeOrder` and in the UI |
+| New accounts are always `pending` resellers | `convex/auth.ts` → `createOrUpdateUser` |
+| Admin-only functions | `convex/lib.ts` → `requireAdmin`, plus `app/admin/layout.tsx` |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Prices are stored in millimes (`20000` = `20,000 DT`). A price of `null`
+shows as `[XX] DT` until the client provides it.
 
-## Deploy on Vercel
+## Tests
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm test   # convex-test: price gating, order pricing, stock, admin access, CSV import
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Client placeholders
+
+Marked `[…]` in the UI: company presentation, map link, delivery delay,
+legal texts, wholesale price, delivery fee, product photos, validation delay.
+The retail price (20,000 DT) and stock (100 per variant) in the seed are
+demo values to confirm.

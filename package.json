@@ -6,22 +6,36 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "convex": "convex dev"
   },
   "dependencies": {
+    "@auth/core": "^0.41.1",
+    "@convex-dev/auth": "^0.0.98",
+    "@radix-ui/react-label": "^2.1.17",
+    "@radix-ui/react-slot": "^1.5.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "convex": "^1.49.0",
+    "lucide-react": "^1.73.0",
+    "next": "^16.4.6",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "next": "15.5.4"
+    "tailwind-merge": "^3.7.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@edge-runtime/vm": "^5.0.0",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
+    "convex-test": "^0.0.71",
     "eslint": "^9",
-    "eslint-config-next": "15.5.4",
-    "@eslint/eslintrc": "^3"
+    "eslint-config-next": "^16.4.6",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }
