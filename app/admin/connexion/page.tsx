@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminSignInPage() {
   const token = await convexAuthNextjsToken();
   const me = token ? await fetchQuery(api.profiles.me, {}, { token }) : null;
-  if (me?.role === "admin") redirect("/admin");
+  if (me?.isAdmin) redirect("/admin");
 
   return (
     <main className="flex min-h-dvh items-start justify-center bg-navy-deep px-4 pt-[clamp(40px,12vh,120px)] pb-12">
@@ -28,7 +28,20 @@ export default async function AdminSignInPage() {
           </h1>
           <p className="m-0 text-soft">Accès réservé à l&apos;équipe ONEsource.IT.</p>
         </div>
-        {me ? <NotAdmin email={me.email} /> : <SignInForm variant="admin" />}
+        {me ? (
+          <NotAdmin
+            email={me.email}
+            adminStatus={me.role === "admin" && me.status !== "approved" ? me.status : undefined}
+            reason={me.refusalReason}
+          />
+        ) : (
+          <>
+            <SignInForm variant="admin" />
+            <p className="m-0 text-center">
+              Nouveau dans l&apos;équipe ? <Link href="/admin/inscription" className="font-semibold text-red-text">Demander un accès admin</Link>
+            </p>
+          </>
+        )}
       </div>
     </main>
   );

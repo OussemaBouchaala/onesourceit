@@ -7,8 +7,8 @@ import {
 // Signed-out visitors are sent to the matching login page: resellers to
 // /connexion, the back office to /admin/connexion. The admin role itself is
 // checked in app/admin/(panel)/layout.tsx and again in every Convex admin
-// function; /admin/connexion handles signed-in visitors itself.
-const isAdminLogin = createRouteMatcher(["/admin/connexion"]);
+// function; /admin/connexion and /admin/inscription handle signed-in visitors themselves.
+const isAdminLogin = createRouteMatcher(["/admin/connexion", "/admin/inscription"]);
 const isAdmin = createRouteMatcher(["/admin(.*)"]);
 const isAccount = createRouteMatcher(["/compte(.*)"]);
 const isAuthPage = createRouteMatcher(["/connexion", "/inscription"]);

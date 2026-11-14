@@ -51,12 +51,34 @@ function signUpProfile(params: Record<string, unknown>) {
   return { email, ...fields, phone: fields.phone, whatsapp: fields.whatsapp ?? undefined };
 }
 
+/**
+ * Admin access request: only name, email and phone. The account starts as a
+ * pending admin with no access until the super admin approves it.
+ */
+function adminSignUpProfile(params: Record<string, unknown>) {
+  const email = str(params.email).toLowerCase();
+  const fullName = str(params.fullName);
+  const phone = normalizeTnPhone(str(params.phone));
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    throw new ConvexError("Adresse email invalide.");
+  if (fullName.length < 2 || fullName.length > 120)
+    throw new ConvexError("Nom et prénom invalides.");
+  if (!phone)
+    throw new ConvexError("Téléphone invalide (format +216 suivi de 8 chiffres).");
+  return { kind: "admin" as const, email, fullName, phone };
+}
+
+type SignUp =
+  | ReturnType<typeof adminSignUpProfile>
+  | (ReturnType<typeof signUpProfile> & { kind?: undefined });
+
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Password<DataModel>({
       profile(params) {
         if (params.flow === "signUp") {
-          const p = signUpProfile(params);
+          const p: SignUp =
+            params.kind === "admin" ? adminSignUpProfile(params) : signUpProfile(params);
           // Extra keys travel to createOrUpdateUser below.
           return { ...p, name: p.fullName } as never;
         }
@@ -72,15 +94,33 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   ],
   callbacks: {
     // Creates the user and its profile in one transaction. A new account is
-    // always a pending reseller; only an admin can change role or status.
+    // always pending (reseller, or admin when requested from
+    // /admin/inscription); only an admin can approve a reseller and only the
+    // super admin can approve an admin.
     async createOrUpdateUser(ctx, args) {
       if (args.existingUserId) return args.existingUserId;
-      const p = args.profile as ReturnType<typeof signUpProfile>;
+      const p = args.profile as unknown as SignUp;
       const userId = await ctx.db.insert("users", {
         email: p.email,
         name: p.fullName,
         phone: p.phone,
       });
+      if (p.kind === "admin") {
+        await ctx.db.insert("profiles", {
+          userId,
+          role: "admin",
+          status: "pending",
+          fullName: p.fullName,
+          email: p.email,
+          phone: p.phone,
+          shopName: "",
+          activityType: "",
+          governorate: "",
+          city: "",
+          address: "",
+        });
+        return userId;
+      }
       await ctx.db.insert("profiles", {
         userId,
         role: "reseller",

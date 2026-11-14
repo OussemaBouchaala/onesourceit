@@ -25,7 +25,7 @@ export function Header() {
   const account =
     me === undefined || me === null
       ? { href: "/connexion", label: "Se connecter" }
-      : me.role === "admin"
+      : me.isAdmin
         ? { href: "/admin", label: "Administration" }
         : { href: "/compte", label: "Mon compte" };
   const showSignup = me === null;

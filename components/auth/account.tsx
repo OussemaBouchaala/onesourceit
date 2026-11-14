@@ -31,7 +31,7 @@ export function Account() {
           Mon <em className="text-red-text">compte</em>
         </h1>
         <div className="flex gap-2">
-          {me.role === "admin" && <Button asChild variant="secondary" size="sm"><Link href="/admin">Administration</Link></Button>}
+          {me.isAdmin && <Button asChild variant="secondary" size="sm"><Link href="/admin">Administration</Link></Button>}
           <Button variant="outline" size="sm" onClick={logout}>Se déconnecter</Button>
         </div>
       </div>
@@ -43,19 +43,19 @@ export function Account() {
       )}
       {me.status === "refused" && (
         <p role="status" className="m-0 rounded-[14px] bg-bad-soft p-4 leading-normal text-bad-ink">
-          Votre demande revendeur n&apos;a pas été acceptée.{me.refusalReason ? ` Motif : ${me.refusalReason}` : ""} Contactez-nous pour plus d&apos;informations.
+          {me.role === "admin" ? "Votre accès admin a été refusé." : "Votre demande revendeur n'a pas été acceptée."}{me.refusalReason ? ` Motif : ${me.refusalReason}` : ""} Contactez-nous pour plus d&apos;informations.
         </p>
       )}
 
       <section className="flex flex-col gap-3 rounded-[20px] border border-line bg-card p-[clamp(20px,5vw,28px)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <strong className="font-display text-xl">{me.shopName}</strong>
+          <strong className="font-display text-xl">{me.shopName || me.fullName}</strong>
           <Badge variant={me.status === "approved" ? "ok" : me.status === "pending" ? "warn" : "bad"}>
-            {me.role === "admin" ? "Administrateur" : `Revendeur · ${PROFILE_STATUS_LABEL[me.status]}`}
+            {me.role === "admin" ? `Administrateur · ${PROFILE_STATUS_LABEL[me.status]}` : `Revendeur · ${PROFILE_STATUS_LABEL[me.status]}`}
           </Badge>
         </div>
         <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] gap-4 text-[15px]">
-          {[["Responsable", me.fullName], ["Email", me.email], ["Téléphone", me.phone], ["Adresse", `${me.address}, ${me.city}, ${me.governorate}`]].map(([k, v]) => (
+          {[["Responsable", me.fullName], ["Email", me.email], ["Téléphone", me.phone], ["Adresse", me.address && `${me.address}, ${me.city}, ${me.governorate}`]].filter(([, v]) => v).map(([k, v]) => (
             <div key={k} className="flex flex-col gap-1"><dt className="text-[13px] tracking-[0.1em] text-muted uppercase">{k}</dt><dd className="m-0">{v}</dd></div>
           ))}
         </dl>

@@ -11,6 +11,8 @@ export const me = query({
     return {
       _id: p._id,
       role: p.role,
+      isAdmin: viewer.isAdmin,
+      isSuperAdmin: viewer.isSuperAdmin,
       status: p.status,
       refusalReason: p.refusalReason ?? null,
       shopName: p.shopName,
