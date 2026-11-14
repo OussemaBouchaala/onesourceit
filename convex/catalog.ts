@@ -2,7 +2,7 @@ import { query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
-import { getViewer, wholesalePriceFor, getSetting, variantLabel } from "./lib";
+import { getViewer, wholesalePriceFor, getSetting, variantLabel, photoUrl } from "./lib";
 
 /** Brands with their model count, for the homepage. */
 export const brands = query({
@@ -161,9 +161,14 @@ export const variantPhotos = query({
         q.eq("productId", productId).eq("modelId", modelId).eq("colorId", colorId),
       )
       .collect();
-    return (
-      await Promise.all(rows.map(async (r) => ({ _id: r._id, url: await ctx.storage.getUrl(r.storageId) })))
-    ).filter((r): r is { _id: typeof r._id; url: string } => r.url !== null);
+    const out = await Promise.all(
+      rows.map(async (r) => ({
+        _id: r._id,
+        url: await photoUrl(ctx, r, 1200),
+        thumbUrl: await photoUrl(ctx, r, 200),
+      })),
+    );
+    return out.filter((r): r is { _id: typeof r._id; url: string; thumbUrl: string } => r.url !== null);
   },
 });
 
@@ -172,5 +177,5 @@ async function firstPhotoUrl(ctx: QueryCtx, productId: Id<"products">) {
     .query("photos")
     .withIndex("by_product", (q) => q.eq("productId", productId))
     .first();
-  return photo ? await ctx.storage.getUrl(photo.storageId) : null;
+  return photo ? await photoUrl(ctx, photo, 600) : null;
 }

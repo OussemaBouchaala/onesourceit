@@ -1,7 +1,16 @@
-import { mutation, query } from "./_generated/server";
+import { action, internalQuery, mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
 import { orderStatus, priceType, profileStatus } from "./schema";
-import { getSetting, requireAdmin, variantLabel } from "./lib";
+import {
+  cloudinaryConfig,
+  cloudinarySignature,
+  getSetting,
+  photoPublicId,
+  requireAdmin,
+  variantLabel,
+} from "./lib";
 
 const price = v.union(v.number(), v.null());
 function checkPrice(p: number | null) {
@@ -312,24 +321,94 @@ export const setProductImage = mutation({
 
 // ---------- Bulk photos ----------
 
-/** Attaches an uploaded photo to a product + model + color, replacing the same position. */
+/** Where the admin uploads photos: Cloudinary when configured, else Convex storage. */
+export const photoBackend = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return cloudinaryConfig() ? ("cloudinary" as const) : ("convex" as const);
+  },
+});
+
+export const assertAdmin = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+  },
+});
+
+/**
+ * Signs one direct browser → Cloudinary upload. The API secret never leaves
+ * the server; the signature pins the public id, so the upload can only land
+ * at the slot for this product + model + color + position.
+ */
+export const signPhotoUpload = action({
+  args: {
+    productId: v.id("products"),
+    modelId: v.id("models"),
+    colorId: v.id("colors"),
+    position: v.number(),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ uploadUrl: string; fields: Record<string, string | number> }> => {
+    await ctx.runQuery(internal.admin.assertAdmin, {});
+    checkPosition(args.position);
+    const cfg = cloudinaryConfig();
+    if (!cfg) throw new ConvexError("Cloudinary n'est pas configuré.");
+    const params = {
+      public_id: photoPublicId(args.productId, args.modelId, args.colorId, args.position),
+      overwrite: "true",
+      invalidate: "true",
+      allowed_formats: "jpg,jpeg,png,webp,heic,avif",
+      timestamp: Math.floor(Date.now() / 1000),
+    };
+    return {
+      uploadUrl: `https://api.cloudinary.com/v1_1/${cfg.cloudName}/image/upload`,
+      fields: { ...params, api_key: cfg.apiKey, signature: await cloudinarySignature(params, cfg.apiSecret) },
+    };
+  },
+});
+
+function checkPosition(position: number) {
+  if (!Number.isInteger(position) || position < 1 || position > 20)
+    throw new ConvexError("Numéro de photo invalide (1 à 20).");
+}
+
+/**
+ * Attaches an uploaded photo to a product + model + color, replacing the
+ * same position. Pass storageId (Convex storage) or publicId + version
+ * (Cloudinary, after signPhotoUpload).
+ */
 export const addPhoto = mutation({
   args: {
     productId: v.id("products"),
     modelId: v.id("models"),
     colorId: v.id("colors"),
     position: v.number(),
-    storageId: v.id("_storage"),
+    storageId: v.optional(v.id("_storage")),
+    publicId: v.optional(v.string()),
+    version: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    const meta = await ctx.db.system.get(args.storageId);
-    if (!meta || !meta.contentType?.startsWith("image/") || meta.size > 5_000_000) {
-      await ctx.storage.delete(args.storageId);
-      throw new ConvexError("Image invalide (5 Mo maximum).");
+    checkPosition(args.position);
+    let file: { storageId?: Id<"_storage">; publicId?: string; version?: number };
+    if (args.storageId) {
+      const meta = await ctx.db.system.get(args.storageId);
+      if (!meta || !meta.contentType?.startsWith("image/") || meta.size > 5_000_000) {
+        await ctx.storage.delete(args.storageId);
+        throw new ConvexError("Image invalide (5 Mo maximum).");
+      }
+      file = { storageId: args.storageId, publicId: undefined, version: undefined };
+    } else if (args.publicId) {
+      if (args.publicId !== photoPublicId(args.productId, args.modelId, args.colorId, args.position))
+        throw new ConvexError("Photo invalide.");
+      file = { publicId: args.publicId, version: args.version, storageId: undefined };
+    } else {
+      throw new ConvexError("Photo manquante.");
     }
-    if (!Number.isInteger(args.position) || args.position < 1 || args.position > 20)
-      throw new ConvexError("Numéro de photo invalide (1 à 20).");
     const existing = await ctx.db
       .query("photos")
       .withIndex("by_variant", (q) =>
@@ -341,10 +420,16 @@ export const addPhoto = mutation({
       )
       .unique();
     if (existing) {
-      await ctx.storage.delete(existing.storageId);
-      await ctx.db.patch(existing._id, { storageId: args.storageId });
+      if (existing.storageId && existing.storageId !== file.storageId) await ctx.storage.delete(existing.storageId);
+      await ctx.db.patch(existing._id, file);
     } else {
-      await ctx.db.insert("photos", args);
+      await ctx.db.insert("photos", {
+        productId: args.productId,
+        modelId: args.modelId,
+        colorId: args.colorId,
+        position: args.position,
+        ...file,
+      });
     }
   },
 });
