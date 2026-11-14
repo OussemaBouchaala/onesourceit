@@ -21,11 +21,12 @@ async function userWith(
   t: ReturnType<typeof convexTest>,
   role: "reseller" | "admin",
   status: "pending" | "approved" | "refused",
+  superAdmin?: boolean,
 ) {
   const userId = await t.run(async (ctx) => {
-    const userId = await ctx.db.insert("users", { email: `${role}-${status}@test.tn` });
+    const userId = await ctx.db.insert("users", { email: `${role}-${status}${superAdmin ? "-super" : ""}@test.tn` });
     await ctx.db.insert("profiles", {
-      userId, role, status, shopName: "Boutique test", activityType: "Grossiste",
+      userId, role, status, superAdmin, shopName: "Boutique test", activityType: "Grossiste",
       fullName: "Test", email: `${role}-${status}@test.tn`, phone: "+21620000000",
       governorate: "Sfax", city: "Sfax", address: "Rue test",
     });
@@ -168,6 +169,53 @@ describe("admin", () => {
     expect(cat.colors.some((c) => c.name === "Lavande")).toBe(true);
     expect(cat.products[0].wholesalePrice).toBe(13500);
     expect(cat.products[0].retailPrice).toBe(20000);
+  });
+});
+
+describe("admin team", () => {
+  test("pending and refused admins have no admin access", async () => {
+    const { t } = await setup();
+    for (const status of ["pending", "refused"] as const) {
+      const admin = await userWith(t, "admin", status);
+      await expect(admin.query(api.admin.dashboard, {})).rejects.toThrow(/administration/);
+      await expect(admin.query(api.admin.resellers, {})).rejects.toThrow(/administration/);
+      expect((await admin.query(api.profiles.me, {}))!.isAdmin).toBe(false);
+    }
+  });
+
+  test("only the super admin sees the team and approves admins", async () => {
+    const { t } = await setup();
+    const candidate = await userWith(t, "admin", "pending");
+    const admin = await userWith(t, "admin", "approved");
+    const boss = await userWith(t, "admin", "approved", true);
+    await expect(admin.query(api.admin.team, {})).rejects.toThrow(/super admin/);
+
+    const row = (await boss.query(api.admin.team, {})).find((r) => r.status === "pending")!;
+    await expect(admin.mutation(api.admin.setAdminStatus, { profileId: row._id, status: "approved" })).rejects.toThrow(/super admin/);
+    expect((await boss.query(api.admin.dashboard, {})).pendingAdmins).toBe(1);
+    expect((await admin.query(api.admin.dashboard, {})).pendingAdmins).toBe(0);
+
+    await boss.mutation(api.admin.setAdminStatus, { profileId: row._id, status: "approved" });
+    expect((await candidate.query(api.profiles.me, {}))!.isAdmin).toBe(true);
+    await candidate.query(api.admin.dashboard, {});
+
+    await boss.mutation(api.admin.setAdminStatus, { profileId: row._id, status: "refused", reason: "Départ" });
+    await expect(candidate.query(api.admin.dashboard, {})).rejects.toThrow(/administration/);
+  });
+
+  test("the super admin cannot be removed", async () => {
+    const { t } = await setup();
+    const boss = await userWith(t, "admin", "approved", true);
+    const self = (await boss.query(api.admin.team, {})).find((r) => r.superAdmin)!;
+    await expect(boss.mutation(api.admin.setAdminStatus, { profileId: self._id, status: "refused" })).rejects.toThrow(/super admin/);
+  });
+
+  test("makeSuperAdmin promotes an existing account", async () => {
+    const { t } = await setup();
+    const user = await userWith(t, "reseller", "approved");
+    await t.mutation(internal.seed.makeSuperAdmin, { email: "reseller-approved@test.tn" });
+    const me = (await user.query(api.profiles.me, {}))!;
+    expect([me.isAdmin, me.isSuperAdmin]).toEqual([true, true]);
   });
 });
 

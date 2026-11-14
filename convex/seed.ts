@@ -71,3 +71,19 @@ export const makeAdmin = internalMutation({
     await ctx.db.patch(profile._id, { role: "admin", status: "approved" });
   },
 });
+
+/**
+ * Makes an existing account the super admin, who approves new admins:
+ *   npx convex run seed:makeSuperAdmin '{"email":"you@example.com"}'
+ */
+export const makeSuperAdmin = internalMutation({
+  args: { email: v.string() },
+  handler: async (ctx, { email }) => {
+    const profile = await ctx.db
+      .query("profiles")
+      .filter((q) => q.eq(q.field("email"), email.toLowerCase()))
+      .unique();
+    if (!profile) throw new ConvexError("Aucun compte avec cet email.");
+    await ctx.db.patch(profile._id, { role: "admin", status: "approved", superAdmin: true, refusalReason: undefined });
+  },
+});

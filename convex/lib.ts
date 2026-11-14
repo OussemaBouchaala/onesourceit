@@ -5,22 +5,26 @@ import type { Doc, Id } from "./_generated/dataModel";
 
 export type Viewer = {
   profile: Doc<"profiles"> | null;
+  /** Approved admin (pending or refused admins have no access). */
   isAdmin: boolean;
+  /** The approved admin who manages the admin team. */
+  isSuperAdmin: boolean;
   /** Approved reseller: may see and pay wholesale prices. */
   isApproved: boolean;
 };
 
 export async function getViewer(ctx: QueryCtx): Promise<Viewer> {
   const userId = await getAuthUserId(ctx);
-  if (!userId) return { profile: null, isAdmin: false, isApproved: false };
+  if (!userId) return { profile: null, isAdmin: false, isSuperAdmin: false, isApproved: false };
   const profile = await ctx.db
     .query("profiles")
     .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = profile?.role === "admin" && profile.status === "approved";
   return {
     profile,
     isAdmin,
+    isSuperAdmin: isAdmin && profile?.superAdmin === true,
     isApproved: !!profile && profile.role === "reseller" && profile.status === "approved",
   };
 }
@@ -28,6 +32,12 @@ export async function getViewer(ctx: QueryCtx): Promise<Viewer> {
 export async function requireAdmin(ctx: QueryCtx) {
   const viewer = await getViewer(ctx);
   if (!viewer.isAdmin) throw new ConvexError("Accès réservé à l'administration.");
+  return viewer;
+}
+
+export async function requireSuperAdmin(ctx: QueryCtx) {
+  const viewer = await getViewer(ctx);
+  if (!viewer.isSuperAdmin) throw new ConvexError("Accès réservé au super admin.");
   return viewer;
 }
 

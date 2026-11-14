@@ -10,6 +10,7 @@ import {
   photoPublicId,
   photoUrl,
   requireAdmin,
+  requireSuperAdmin,
   variantLabel,
 } from "./lib";
 
@@ -22,7 +23,7 @@ function checkPrice(p: number | null) {
 export const dashboard = query({
   args: {},
   handler: async (ctx) => {
-    await requireAdmin(ctx);
+    const viewer = await requireAdmin(ctx);
     const [newOrders, pending, approved] = await Promise.all([
       ctx.db.query("orders").withIndex("by_status", (q) => q.eq("status", "new")).collect(),
       ctx.db.query("profiles").withIndex("by_status", (q) => q.eq("status", "pending")).collect(),
@@ -32,6 +33,7 @@ export const dashboard = query({
       newOrders: newOrders.length,
       pendingResellers: pending.filter((p) => p.role === "reseller").length,
       approvedResellers: approved.filter((p) => p.role === "reseller").length,
+      pendingAdmins: viewer.isSuperAdmin ? pending.filter((p) => p.role === "admin").length : 0,
       deliveryFee: await getSetting(ctx, "deliveryFee"),
     };
   },
@@ -151,6 +153,47 @@ export const setResellerStatus = mutation({
     await requireAdmin(ctx);
     const profile = await ctx.db.get(profileId);
     if (!profile || profile.role !== "reseller") throw new ConvexError("Revendeur introuvable.");
+    await ctx.db.patch(profileId, {
+      status,
+      refusalReason: status === "refused" ? reason?.trim().slice(0, 300) || undefined : undefined,
+    });
+  },
+});
+
+// ---------- Admin team (super admin only) ----------
+
+export const team = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireSuperAdmin(ctx);
+    const rows = await ctx.db.query("profiles").order("desc").collect();
+    return rows
+      .filter((p) => p.role === "admin")
+      .map((p) => ({
+        _id: p._id,
+        createdAt: p._creationTime,
+        status: p.status,
+        superAdmin: p.superAdmin === true,
+        refusalReason: p.refusalReason ?? null,
+        fullName: p.fullName,
+        email: p.email,
+        phone: p.phone,
+      }));
+  },
+});
+
+/** Approve, refuse or remove (status "refused") another admin. */
+export const setAdminStatus = mutation({
+  args: {
+    profileId: v.id("profiles"),
+    status: profileStatus,
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, { profileId, status, reason }) => {
+    await requireSuperAdmin(ctx);
+    const profile = await ctx.db.get(profileId);
+    if (!profile || profile.role !== "admin") throw new ConvexError("Admin introuvable.");
+    if (profile.superAdmin) throw new ConvexError("Le super admin ne peut pas être modifié.");
     await ctx.db.patch(profileId, {
       status,
       refusalReason: status === "refused" ? reason?.trim().slice(0, 300) || undefined : undefined,

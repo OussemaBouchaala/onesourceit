@@ -30,8 +30,13 @@ export default defineSchema({
   profiles: defineTable({
     userId: v.id("users"),
     role: v.union(v.literal("reseller"), v.literal("admin")),
+    // Resellers and admins both start "pending". An admin only gets access
+    // once approved by the super admin.
     status: profileStatus,
+    // The one account that approves, refuses and removes other admins.
+    superAdmin: v.optional(v.boolean()),
     refusalReason: v.optional(v.string()),
+    // Shop and address fields are empty strings on admin profiles.
     shopName: v.string(),
     activityType: v.string(),
     taxId: v.optional(v.string()),

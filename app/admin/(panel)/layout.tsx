@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 // check the admin role; every Convex admin function checks it again.
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const me = await fetchQuery(api.profiles.me, {}, { token: await convexAuthNextjsToken() });
-  if (!me || me.role !== "admin") redirect("/admin/connexion");
+  if (!me?.isAdmin) redirect("/admin/connexion");
   return (
     <div className="flex min-h-dvh flex-wrap items-start">
       <AdminNav />
