@@ -77,8 +77,8 @@ export function cloudinaryConfig() {
 }
 
 /** Deterministic id, so re-importing the same file name replaces the photo. */
-export function photoPublicId(productId: string, modelId: string, colorId: string, position: number) {
-  return `onesourceit/${productId}/${modelId}_${colorId}_${position}`;
+export function photoPublicId(productId: string, modelId: string | undefined, colorId: string, position: number) {
+  return `onesourceit/${productId}/${modelId ?? "all"}_${colorId}_${position}`;
 }
 
 /**

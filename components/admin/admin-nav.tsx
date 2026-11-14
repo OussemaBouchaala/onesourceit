@@ -15,6 +15,7 @@ export function AdminNav() {
     { href: "/admin/commandes", label: "Commandes", badge: stats?.newOrders ?? 0 },
     { href: "/admin/revendeurs", label: "Revendeurs", badge: stats?.pendingResellers ?? 0 },
     { href: "/admin/produits", label: "Produits & stock", badge: 0 },
+    { href: "/admin/photos", label: "Photos", badge: 0 },
     { href: "/admin/import", label: "Import", badge: 0 },
   ];
   return (

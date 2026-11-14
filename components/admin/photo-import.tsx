@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { Upload } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { matchName, parseFileName, toWebp } from "@/lib/import";
+import { matchName, parseFileName } from "@/lib/import";
+import { usePhotoUpload } from "./use-photo-upload";
 import { cn } from "@/lib/utils";
 
 type Row = {
@@ -27,10 +28,7 @@ type Row = {
 
 export function PhotoImport() {
   const catalog = useQuery(api.admin.catalog);
-  const backend = useQuery(api.admin.photoBackend);
-  const generateUploadUrl = useMutation(api.admin.generateUploadUrl);
-  const signPhotoUpload = useAction(api.admin.signPhotoUpload);
-  const addPhoto = useMutation(api.admin.addPhoto);
+  const { backend, upload: uploadPhoto } = usePhotoUpload();
   const addModel = useMutation(api.admin.addModel);
   const [productId, setProductId] = useState<string>("");
   const [compress, setCompress] = useState(true);
@@ -82,25 +80,7 @@ export function PhotoImport() {
           created.set(k, modelId);
         }
         const slot = { productId: activeProductId as Id<"products">, modelId, colorId: r.colorId as Id<"colors">, position: r.position };
-        if (backend === "cloudinary") {
-          // Full-resolution original, unless it's over Cloudinary's 10 MB limit.
-          const file = r.file.size > CLOUDINARY_MAX_BYTES ? await toWebp(r.file, 4000, 0.9) : r.file;
-          const { uploadUrl, fields } = await signPhotoUpload(slot);
-          const form = new FormData();
-          for (const [k, val] of Object.entries(fields)) form.append(k, String(val));
-          form.append("file", file);
-          const res = await fetch(uploadUrl, { method: "POST", body: form });
-          const json = await res.json().catch(() => null);
-          if (!res.ok || !json?.public_id) throw new Error(json?.error?.message ?? "Envoi refusé");
-          await addPhoto({ ...slot, publicId: json.public_id, version: json.version });
-        } else {
-          const blob = compress ? await toWebp(r.file) : r.file;
-          const url = await generateUploadUrl();
-          const res = await fetch(url, { method: "POST", headers: { "Content-Type": blob.type }, body: blob });
-          if (!res.ok) throw new Error("Envoi refusé");
-          const { storageId } = await res.json();
-          await addPhoto({ ...slot, storageId });
-        }
+        await uploadPhoto(slot, r.file, { compress });
         update(r.key, { state: "done" });
       } catch (e) {
         update(r.key, { state: "error", error: String((e as { data?: string })?.data ?? (e as Error).message) });
@@ -227,8 +207,6 @@ export function PhotoImport() {
     </div>
   );
 }
-
-const CLOUDINARY_MAX_BYTES = 10_000_000; // Free plan limit per image
 
 function titleCase(s: string) {
   return s.replace(/[-\s]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
