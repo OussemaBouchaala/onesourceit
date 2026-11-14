@@ -5,7 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { PageTitle, Pill } from "@/components/admin/page-title";
+import { PageTitle, Pill, PillRow } from "@/components/admin/page-title";
 import { Button } from "@/components/ui/button";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,11 +23,11 @@ export default function ProductsAdminPage() {
   return (
     <>
       <PageTitle title="Produits & stock" subtitle="Gammes, modèles, couleurs, stock et prix. Prix vides = « [XX] DT » sur le site." />
-      <div className="flex flex-wrap gap-2">
+      <PillRow aria-label="Produit">
         {data.products.map((p) => (
           <Pill key={p._id} on={product?._id === p._id} onClick={() => setProductId(p._id)}>{p.name}</Pill>
         ))}
-      </div>
+      </PillRow>
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-4">
         {product && <PricesCard key={product._id + String(product.retailPrice) + String(product.wholesalePrice)} product={product} />}
@@ -146,12 +146,12 @@ function VariantsTable({
           {rows.length === 0 && <TableRow><TableCell colSpan={4} className="text-muted">Aucune variante. Ajoutez-en ci-dessous ou via l&apos;import CSV.</TableCell></TableRow>}
           {rows.map((v) => (
             <TableRow key={v._id}>
-              <TableCell className="whitespace-nowrap">
+              <TableCell className="font-semibold whitespace-nowrap max-md:text-base">
                 <span className="mr-2 inline-block size-4 rounded-full border border-white/20 align-middle" style={{ background: v.hex }} aria-hidden />
                 {v.label}
               </TableCell>
-              <TableCell>{photoCounts?.[`${v.modelId}_${v.colorId}`] ?? 0}</TableCell>
-              <TableCell>
+              <TableCell label="Photos">{photoCounts?.[`${v.modelId}_${v.colorId}`] ?? 0}</TableCell>
+              <TableCell label="Stock">
                 <label className="sr-only" htmlFor={`stock-${v._id}`}>Stock {v.label}</label>
                 <Input
                   id={`stock-${v._id}`}
@@ -166,13 +166,13 @@ function VariantsTable({
                   }}
                 />
               </TableCell>
-              <TableCell>
+              <TableCell label="En vente">
                 <input
                   type="checkbox"
                   aria-label={`${v.label} en vente`}
                   checked={v.isActive}
                   onChange={(e) => updateVariant({ variantId: v._id, stock: v.stock, isActive: e.target.checked })}
-                  className="size-5 accent-cta"
+                  className="size-6 accent-cta md:size-5"
                 />
               </TableCell>
             </TableRow>

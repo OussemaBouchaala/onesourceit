@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { PageTitle, Pill } from "@/components/admin/page-title";
+import { PageTitle, Pill, PillRow } from "@/components/admin/page-title";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,12 +23,12 @@ export default function ResellersPage() {
   return (
     <>
       <PageTitle title="Revendeurs" subtitle="Vérifiez chaque boutique avant de débloquer le prix de gros." />
-      <div className="flex flex-wrap gap-2">
+      <PillRow>
         <Pill on={status === "pending"} onClick={() => setStatus("pending")}>Inscriptions en attente</Pill>
         <Pill on={status === "approved"} onClick={() => setStatus("approved")}>Validés</Pill>
         <Pill on={status === "refused"} onClick={() => setStatus("refused")}>Refusés</Pill>
         <Pill on={!status} onClick={() => setStatus(undefined)}>Tous</Pill>
-      </div>
+      </PillRow>
       <Table>
         <TableHeader>
           <TableRow>
@@ -42,20 +42,20 @@ export default function ResellersPage() {
           {rows?.map((r) => (
             <TableRow key={r._id}>
               <TableCell><strong>{r.shopName}</strong><br /><span className="text-[13px] text-muted">{r.activityType} · {formatDate(r.createdAt)}</span></TableCell>
-              <TableCell>
+              <TableCell label="Responsable" className="max-md:col-span-2">
                 {r.fullName}<br />
                 <a href={`tel:${r.phone}`} className="text-[13px] text-muted">{r.phone}</a>
                 {" · "}
                 <a href={whatsappLink().replace(/\d+$/, (r.whatsapp ?? r.phone).replace("+", ""))} target="_blank" rel="noopener noreferrer" className="text-[13px] text-muted">WhatsApp</a>
                 <br /><a href={`mailto:${r.email}`} className="text-[13px] text-muted">{r.email}</a>
               </TableCell>
-              <TableCell className="min-w-[180px]">{r.address}<br /><span className="text-[13px] text-muted">{r.city}, {r.governorate}</span></TableCell>
-              <TableCell className="font-mono text-sm">{r.taxId ?? "—"}<br />{r.rne ?? "—"}</TableCell>
-              <TableCell>
+              <TableCell label="Adresse" className="md:min-w-[180px]">{r.address}<br /><span className="text-[13px] text-muted">{r.city}, {r.governorate}</span></TableCell>
+              <TableCell label="Matricule / RNE" className="font-mono text-sm">{r.taxId ?? "—"}<br />{r.rne ?? "—"}</TableCell>
+              <TableCell label="Statut">
                 <Badge variant={r.status === "approved" ? "ok" : r.status === "pending" ? "warn" : "bad"}>{PROFILE_STATUS_LABEL[r.status]}</Badge>
                 {r.refusalReason && <div className="mt-1 max-w-[200px] text-[13px] text-muted">{r.refusalReason}</div>}
               </TableCell>
-              <TableCell>
+              <TableCell className="max-md:col-span-2">
                 {refusing === r._id ? (
                   <form
                     className="flex min-w-[220px] flex-col gap-2"
