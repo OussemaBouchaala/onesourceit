@@ -8,12 +8,11 @@ import { AdminNav } from "@/components/admin/admin-nav";
 export const metadata: Metadata = { title: "Administration", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
-// The proxy already sends signed-out visitors to /connexion. Here we check
-// the admin role; every Convex admin function checks it again.
+// The proxy already sends signed-out visitors to /admin/connexion. Here we
+// check the admin role; every Convex admin function checks it again.
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const me = await fetchQuery(api.profiles.me, {}, { token: await convexAuthNextjsToken() });
-  if (!me) redirect("/connexion");
-  if (me.role !== "admin") redirect("/compte");
+  if (!me || me.role !== "admin") redirect("/admin/connexion");
   return (
     <div className="flex min-h-dvh flex-wrap items-start">
       <AdminNav />
