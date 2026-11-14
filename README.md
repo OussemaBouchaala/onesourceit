@@ -23,16 +23,38 @@ Create the first admin: sign up on `/inscription`, then
 npx convex run seed:makeAdmin '{"email":"you@example.com"}'
 ```
 
-## Deploy (Vercel)
+## Deploy (VPS)
 
-1. Import the GitHub repo in Vercel.
-2. In Convex, Settings → Deploy keys → create a production deploy key.
-   Add it in Vercel as `CONVEX_DEPLOY_KEY`.
-3. Override the Vercel build command:
-   `npx convex deploy --cmd 'npm run build'`
-4. Add `NEXT_PUBLIC_WHATSAPP_NUMBER` (e.g. `21621050742`).
-5. On the production Convex deployment, run `npx @convex-dev/auth --prod`
-   and set `SITE_URL` to the Vercel domain.
+Production runs on a VPS (OVHcloud Tunisie VPS-1 is enough) with Docker:
+the Next.js app behind Caddy, which handles HTTPS. Convex stays the backend.
+Every push to `main` runs `.github/workflows/deploy.yml`: tests, then
+`convex deploy`, then a Docker image pushed to `ghcr.io`, then a restart on
+the VPS.
+
+**One-time setup**
+
+1. Order the VPS (Ubuntu 24.04) and the domain `onesourceit.tn`.
+2. At the registrar, point DNS to the VPS IP: an `A` record for
+   `onesourceit.tn` and one for `www.onesourceit.tn`.
+3. On the VPS, as root: `bash deploy/setup.sh` (Docker, firewall,
+   automatic security updates, a `deploy` user, `/opt/onesourceit`).
+4. Create an SSH key pair for deploys. Put the public key in
+   `/home/deploy/.ssh/authorized_keys` on the VPS.
+5. In GitHub → Settings → Environments → `production`, add:
+   - Secrets: `CONVEX_DEPLOY_KEY` (Convex → Settings → Deploy keys,
+     production), `VPS_HOST` (the IP), `VPS_USER` (`deploy`),
+     `VPS_SSH_KEY` (the private key).
+   - Variables: `NEXT_PUBLIC_CONVEX_URL`
+     (`https://little-dragon-976.convex.cloud`),
+     `NEXT_PUBLIC_WHATSAPP_NUMBER` (e.g. `21621050742`),
+     `DOMAIN` (`onesourceit.tn`).
+6. On the production Convex deployment, set `SITE_URL` to
+   `https://onesourceit.tn` (`npx convex env set SITE_URL https://onesourceit.tn --prod`).
+7. Run the Deploy workflow (Actions → Deploy → Run workflow). Caddy gets the
+   certificate on the first request.
+
+The PoC preview on Vercel (`onesourceit.vercel.app`) can be removed once the
+VPS is live.
 
 ## Where the rules live
 
