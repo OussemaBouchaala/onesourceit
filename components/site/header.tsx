@@ -9,6 +9,7 @@ import { api } from "@/convex/_generated/api";
 import { useCart } from "@/components/cart/cart-context";
 import { Logo } from "./logo";
 import { cn } from "@/lib/utils";
+import { whatsappLink } from "@/lib/format";
 
 const NAV = [
   { href: "/", label: "Accueil" },
@@ -103,6 +104,14 @@ export function Header() {
               Devenir revendeur
             </Link>
           )}
+          <a
+            href={whatsappLink("Bonjour ONEsource IT, j'ai une question.")}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 rounded-full border-[1.5px] border-line-strong px-5 py-3.5 text-center font-semibold text-ink no-underline"
+          >
+            Nous écrire sur WhatsApp
+          </a>
         </nav>
       )}
     </header>

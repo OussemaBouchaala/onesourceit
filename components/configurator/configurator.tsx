@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { Check, Lock, Minus, Plus } from "lucide-react";
 import { api } from "@/convex/_generated/api";
@@ -17,7 +18,8 @@ import { MAX_RETAIL_QTY, WHOLESALE_MIN_QTY, WHOLESALE_STEP } from "@/convex/rule
 export function Configurator({ slug }: { slug: string }) {
   const data = useQuery(api.catalog.productPage, { slug });
   const { add, count } = useCart();
-  const [brandId, setBrandId] = useState<string>("");
+  // ?marque=<brandId> preselects the brand (links from the home page).
+  const [brandId, setBrandId] = useState<string>(useSearchParams().get("marque") ?? "");
   const [modelId, setModelId] = useState<string>("");
   const [colorId, setColorId] = useState<string>("");
   const [qtyInput, setQty] = useState<number | null>(null);
@@ -66,6 +68,20 @@ export function Configurator({ slug }: { slug: string }) {
   const canAdd = !!variant && unit !== null;
   const photo = photos && photos.length > 0 ? photos[Math.min(photoIdx, photos.length - 1)] : null;
 
+  const nextHint = !brandId ? "Choisissez la marque" : !modelId ? "Choisissez le modèle" : !colorId ? "Choisissez la couleur" : null;
+  const qtyStepper = (
+    <div className="flex flex-none items-center rounded-full border border-line-strong bg-card">
+      <button type="button" onClick={() => setQty(Math.max(min, qty - step))} disabled={qty <= min} aria-label="Diminuer la quantité" className="inline-flex size-12 items-center justify-center disabled:opacity-40">
+        <Minus aria-hidden className="size-5" />
+      </button>
+      <span aria-live="polite" className="min-w-9 text-center font-semibold">{qty}</span>
+      <button type="button" onClick={() => setQty(Math.min(max, qty + step))} disabled={qty >= max} aria-label="Augmenter la quantité" className="inline-flex size-12 items-center justify-center disabled:opacity-40">
+        <Plus aria-hidden className="size-5" />
+      </button>
+    </div>
+  );
+  const addLabel = nextHint && !canAdd ? nextHint : `Ajouter${unit !== null ? ` · ${formatDT(unit * qty)}` : " au panier"}`;
+
   function addToCart() {
     if (!variant) return;
     add(variant._id, qty);
@@ -76,7 +92,7 @@ export function Configurator({ slug }: { slug: string }) {
     <main className="mx-auto flex w-full max-w-[1200px] flex-wrap gap-[clamp(24px,5vw,48px)] px-4 pt-[clamp(20px,5vw,56px)] pb-[clamp(48px,8vw,96px)] sm:px-5">
       {/* Visual */}
       <div className="flex min-w-0 flex-[1_1_460px] flex-col gap-3">
-        <div className="flex h-[clamp(300px,80vw,520px)] items-center justify-center overflow-hidden rounded-[28px] bg-card">
+        <div className="flex h-[clamp(220px,58vw,520px)] items-center justify-center overflow-hidden rounded-[28px] bg-card">
           {photo ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={photo.url} alt={`${data.product.name} ${brandName} ${modelName} ${color?.name}`} className="size-full object-contain" />
@@ -113,10 +129,10 @@ export function Configurator({ slug }: { slug: string }) {
           <h1 className="m-0 font-display text-[clamp(34px,9vw,52px)] leading-none font-bold uppercase">
             {data.product.name}
           </h1>
-          <div className="mt-2 grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] gap-3">
-            <div className="flex flex-col gap-1.5 rounded-[18px] border border-line bg-card px-5 py-4">
+          <div className="mt-2 grid grid-cols-2 gap-3 max-[359px]:grid-cols-1">
+            <div className="flex flex-col gap-1.5 rounded-[18px] border border-line bg-card px-4 py-3.5 sm:px-5 sm:py-4">
               <span className="text-[13px] font-semibold tracking-[0.1em] text-muted uppercase">Prix détail</span>
-              <strong className="font-display text-[34px] leading-none">{formatDT(data.product.retailPrice)}</strong>
+              <strong className="font-display text-[clamp(24px,7vw,34px)] leading-none">{formatDT(data.product.retailPrice)}</strong>
               <span className="text-[13px] text-muted">TTC, à l&apos;unité</span>
             </div>
             <WholesaleCard
@@ -127,24 +143,35 @@ export function Configurator({ slug }: { slug: string }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))] gap-4">
-          <label className="flex flex-col gap-2 text-[15px] font-semibold">
-            1. Marque
-            <NativeSelect
-              value={brandId}
-              onChange={(e) => {
-                setBrandId(e.target.value);
-                setModelId("");
-                setColorId("");
-                setAdded(null);
-              }}
-            >
-              <option value="">Choisir une marque…</option>
-              {data.brands.map((b) => (
-                <option key={b._id} value={b._id}>{b.name}</option>
-              ))}
-            </NativeSelect>
-          </label>
+        <fieldset className="m-0 flex flex-col gap-3 border-0 p-0">
+          <legend className="mb-3 text-[15px] font-semibold">1. Marque</legend>
+          <div className="flex flex-wrap gap-2">
+            {data.brands.map((b) => {
+              const on = b._id === brandId;
+              return (
+                <button
+                  key={b._id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => {
+                    setBrandId(b._id);
+                    setModelId("");
+                    setColorId("");
+                    setAdded(null);
+                  }}
+                  className={cn(
+                    "min-h-11 rounded-full border-[1.5px] px-4 text-[15px] font-semibold",
+                    on ? "border-white bg-white text-navy" : "border-line-strong bg-transparent text-ink hover:bg-card",
+                  )}
+                >
+                  {b.name}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        <div className="flex flex-col gap-4">
           <label className="flex flex-col gap-2 text-[15px] font-semibold">
             2. Modèle
             <NativeSelect
@@ -172,12 +199,12 @@ export function Configurator({ slug }: { slug: string }) {
               — {modelId ? (color?.name ?? "choisissez") : "disponible après le modèle"}
             </span>
           </legend>
-          <div className="flex flex-wrap gap-3.5">
+          <div className="flex flex-wrap gap-4">
             {colors.map((c) => {
               const on = c._id === colorId;
               return (
+                <label key={c._id} className="flex w-16 flex-col items-center gap-1.5 text-center text-[13px] leading-tight text-soft">
                 <button
-                  key={c._id}
                   type="button"
                   aria-label={c.name}
                   aria-pressed={on}
@@ -193,26 +220,19 @@ export function Configurator({ slug }: { slug: string }) {
                   )}
                   style={{ background: c.hex }}
                 />
+                <span aria-hidden className={on ? "font-semibold text-ink" : undefined}>{c.name}</span>
+                </label>
               );
             })}
           </div>
         </fieldset>
 
         <div className="flex flex-col gap-2">
-          <span className="text-[15px] font-semibold">4. Quantité</span>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center rounded-full border border-line-strong bg-card">
-              <button type="button" onClick={() => setQty(Math.max(min, qty - step))} disabled={qty <= min} aria-label="Diminuer la quantité" className="inline-flex size-12 items-center justify-center disabled:opacity-40">
-                <Minus aria-hidden className="size-5" />
-              </button>
-              <span aria-live="polite" className="min-w-11 text-center font-semibold">{qty}</span>
-              <button type="button" onClick={() => setQty(Math.min(max, qty + step))} disabled={qty >= max} aria-label="Augmenter la quantité" className="inline-flex size-12 items-center justify-center disabled:opacity-40">
-                <Plus aria-hidden className="size-5" />
-              </button>
-            </div>
-            <Button onClick={addToCart} disabled={!canAdd}>
-              Ajouter au panier{unit !== null ? ` · ${formatDT(unit * qty)}` : ""}
-            </Button>
+          <span className="text-[15px] font-semibold max-md:hidden">4. Quantité</span>
+          {/* Phones get the same controls in the bar fixed at the bottom. */}
+          <div className="hidden flex-wrap items-center gap-3 md:flex">
+            {qtyStepper}
+            <Button onClick={addToCart} disabled={!canAdd}>{addLabel}</Button>
           </div>
           <p className="m-0 text-[13px] text-muted">
             {approved
@@ -230,14 +250,10 @@ export function Configurator({ slug }: { slug: string }) {
         )}
       </div>
 
-      {count > 0 && (
-        <div className="sticky bottom-0 z-20 -mx-4 flex w-[calc(100%+2rem)] items-center justify-between gap-3 border-t border-line bg-card px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.2)] md:hidden">
-          <span className="text-sm text-soft">{count} article{count > 1 ? "s" : ""} au panier</span>
-          <Button asChild size="sm">
-            <Link href="/panier">Voir le panier</Link>
-          </Button>
-        </div>
-      )}
+      <div className="sticky bottom-0 z-20 -mx-4 flex w-[calc(100%+2rem)] items-center gap-2.5 border-t border-line bg-card px-3 pt-2.5 pb-[max(10px,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.25)] md:hidden">
+        {qtyStepper}
+        <Button onClick={addToCart} disabled={!canAdd} className="min-w-0 flex-1 px-4">{addLabel}</Button>
+      </div>
     </main>
   );
 }
@@ -253,9 +269,9 @@ function WholesaleCard({
 }) {
   if (approved) {
     return (
-      <div className="flex flex-col gap-1.5 rounded-[18px] border-[1.5px] border-cta bg-[#3a1a22] px-5 py-4">
+      <div className="flex flex-col gap-1.5 rounded-[18px] border-[1.5px] border-cta bg-[#3a1a22] px-4 py-3.5 sm:px-5 sm:py-4">
         <span className="text-[13px] font-semibold tracking-[0.1em] text-red-text uppercase">Prix en gros</span>
-        <strong className="font-display text-[34px] leading-none">{formatDT(price)}</strong>
+        <strong className="font-display text-[clamp(24px,7vw,34px)] leading-none">{formatDT(price)}</strong>
         <span className="text-[13px] text-soft">Revendeur validé · prix par pièce</span>
       </div>
     );
@@ -263,11 +279,11 @@ function WholesaleCard({
   // Not approved: the server sent no wholesale price. The blurred figure is a
   // fixed fake value, never the real one.
   return (
-    <div className="flex flex-col gap-1.5 rounded-[18px] bg-card px-5 py-4">
+    <div className="flex flex-col gap-1.5 rounded-[18px] bg-card px-4 py-3.5 sm:px-5 sm:py-4">
       <span className="flex items-center gap-2 text-[13px] font-semibold tracking-[0.1em] text-red-text uppercase">
         <Lock aria-hidden className="size-3.5" /> Prix en gros
       </span>
-      <strong aria-hidden className="font-display text-[34px] leading-none blur-[9px] select-none">00,000 DT</strong>
+      <strong aria-hidden className="font-display text-[clamp(24px,7vw,34px)] leading-none blur-[9px] select-none">00,000 DT</strong>
       <span className="text-[13px] text-[#c9d2de]">
         {status === "pending" ? (
           "Votre compte revendeur est en attente de validation."
