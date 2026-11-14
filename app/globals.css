@@ -1,26 +1,70 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* ONEsource IT brand tokens (see the design canvas). */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-navy: #052035;
+  --color-navy-deep: #03182a;
+  --color-card: #0a2b47;
+  --color-line: #1e4466;
+  --color-line-strong: #3a5878;
+  --color-divider: #173552;
+  --color-ink: #f2f5f8;
+  --color-soft: #c5d1dd;
+  --color-muted: #9fb2c6;
+  --color-brand: #ff2a1f; /* logo red */
+  --color-cta: #d91f1f; /* buttons */
+  --color-cta-hover: #b81818;
+  --color-red-text: #ff6b5f; /* red text on navy */
+  --color-ok: #0f7b5f;
+  --color-ok-soft: #e3f4ec;
+  --color-ok-ink: #0b5c47;
+  --color-warn-soft: #fff4e5;
+  --color-warn-ink: #6b3e00;
+  --color-bad-soft: #fbe9e9;
+  --color-bad-ink: #8a1c1c;
+
+  /* shadcn/ui semantic tokens mapped to the brand */
+  --color-background: var(--color-navy);
+  --color-foreground: var(--color-ink);
+  --color-primary: var(--color-cta);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #ffffff;
+  --color-secondary-foreground: var(--color-navy);
+  --color-muted-foreground: var(--color-muted);
+  --color-border: var(--color-line);
+  --color-input: var(--color-line-strong);
+  --color-ring: #f4b3ab;
+  --color-destructive: var(--color-cta);
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-poppins), system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-navy);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+a {
+  text-underline-offset: 3px;
+}
+
+:focus-visible {
+  outline: 3px solid #f4b3ab;
+  outline-offset: 2px;
+}
+
+/* Small red rule before eyebrow labels */
+.eyebrow::before {
+  content: "";
+  width: 28px;
+  height: 2px;
+  background: var(--color-brand);
+  flex: none;
 }
