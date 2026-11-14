@@ -28,8 +28,10 @@ npx convex run seed:makeAdmin '{"email":"you@example.com"}'
 1. Import the GitHub repo in Vercel.
 2. In Convex, Settings → Deploy keys → create a production deploy key.
    Add it in Vercel as `CONVEX_DEPLOY_KEY`.
-3. Override the Vercel build command:
-   `npx convex deploy --cmd 'npm run build'`
+3. The build command is set in `vercel.json`: production builds run
+   `npx convex deploy --cmd 'npm run build'` (pushes Convex functions, then
+   builds against them); preview builds only run `npm run build` against the
+   URL in `NEXT_PUBLIC_CONVEX_URL`.
 4. Add `NEXT_PUBLIC_WHATSAPP_NUMBER` (e.g. `21621050742`).
 5. On the production Convex deployment, run `npx @convex-dev/auth --prod`
    and set `SITE_URL` to the Vercel domain.
