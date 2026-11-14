@@ -84,7 +84,11 @@ export default defineSchema({
     modelId: v.id("models"),
     colorId: v.id("colors"),
     position: v.number(), // the _N in the file name
-    storageId: v.id("_storage"),
+    // Cloudinary (production): public id + version, original kept full size.
+    publicId: v.optional(v.string()),
+    version: v.optional(v.number()),
+    // Convex file storage (fallback when Cloudinary isn't configured).
+    storageId: v.optional(v.id("_storage")),
   })
     .index("by_variant", ["productId", "modelId", "colorId", "position"])
     .index("by_product", ["productId"]),

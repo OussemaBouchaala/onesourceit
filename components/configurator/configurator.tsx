@@ -98,7 +98,7 @@ export function Configurator({ slug }: { slug: string }) {
                 className={cn("size-16 flex-none overflow-hidden rounded-xl border-2 bg-card", i === photoIdx ? "border-cta" : "border-line")}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.url} alt="" className="size-full object-cover" />
+                <img src={p.thumbUrl} alt="" loading="lazy" className="size-full object-cover" />
               </button>
             ))}
           </div>

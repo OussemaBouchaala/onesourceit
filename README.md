@@ -34,6 +34,27 @@ npx convex run seed:makeAdmin '{"email":"you@example.com"}'
 5. On the production Convex deployment, run `npx @convex-dev/auth --prod`
    and set `SITE_URL` to the Vercel domain.
 
+## Product photos (Cloudinary)
+
+Photos are uploaded from Admin → Import straight to Cloudinary at full
+resolution. The site shows resized copies (`f_auto,q_auto`, 1200 px for the
+main photo, 200 px for thumbnails, 600 px for product covers).
+
+1. Create a free Cloudinary account and copy the cloud name, API key and
+   API secret (Settings → API Keys).
+2. Set them on each Convex deployment (never in the Next.js env):
+   ```bash
+   npx convex env set CLOUDINARY_CLOUD_NAME <cloud name>
+   npx convex env set CLOUDINARY_API_KEY <api key>
+   npx convex env set CLOUDINARY_API_SECRET <api secret>
+   # add --prod for production
+   ```
+
+The browser gets a one-time signature from `admin.signPhotoUpload` (admins
+only) that pins the file to its product/model/color/position slot. Without
+these variables, uploads fall back to Convex file storage, compressed to
+1200 px WebP.
+
 ## Where the rules live
 
 | Rule | Where |

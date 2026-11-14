@@ -1,8 +1,9 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
+import { cloudinarySignature } from "./lib";
 import type { Id } from "./_generated/dataModel";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -167,5 +168,52 @@ describe("admin", () => {
     expect(cat.colors.some((c) => c.name === "Lavande")).toBe(true);
     expect(cat.products[0].wholesalePrice).toBe(13500);
     expect(cat.products[0].retailPrice).toBe(20000);
+  });
+});
+
+describe("photos on Cloudinary", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  const env = () => {
+    vi.stubEnv("CLOUDINARY_CLOUD_NAME", "demo-cloud");
+    vi.stubEnv("CLOUDINARY_API_KEY", "123");
+    vi.stubEnv("CLOUDINARY_API_SECRET", "s3cret");
+  };
+
+  test("signature matches Cloudinary's documented example", async () => {
+    const sig = await cloudinarySignature(
+      { eager: "w_400,h_300,c_pad|w_260,h_200,c_crop", public_id: "sample_image", timestamp: 1315060510 },
+      "abcd",
+    );
+    expect(sig).toBe("bfd09f95f331f558cbd1320e67aa8d488770583e");
+  });
+
+  test("only admins get an upload signature, and the secret is never sent", async () => {
+    env();
+    const { t, variant } = await setup();
+    const slot = { productId: variant.productId, modelId: variant.modelId, colorId: variant.colorId, position: 1 };
+    const reseller = await userWith(t, "reseller", "approved");
+    await expect(reseller.action(api.admin.signPhotoUpload, slot)).rejects.toThrow(/administration/);
+
+    const admin = await userWith(t, "admin", "approved");
+    const signed = await admin.action(api.admin.signPhotoUpload, slot);
+    expect(signed.uploadUrl).toBe("https://api.cloudinary.com/v1_1/demo-cloud/image/upload");
+    expect(signed.fields.public_id).toBe(`onesourceit/${slot.productId}/${slot.modelId}_${slot.colorId}_1`);
+    expect(JSON.stringify(signed)).not.toContain("s3cret");
+  });
+
+  test("a stored photo is served resized from Cloudinary; a wrong public id is refused", async () => {
+    env();
+    const { t, variant } = await setup();
+    const admin = await userWith(t, "admin", "approved");
+    const slot = { productId: variant.productId, modelId: variant.modelId, colorId: variant.colorId, position: 1 };
+    await expect(admin.mutation(api.admin.addPhoto, { ...slot, publicId: "onesourceit/other", version: 1 })).rejects.toThrow(/invalide/);
+
+    const publicId = `onesourceit/${slot.productId}/${slot.modelId}_${slot.colorId}_1`;
+    await admin.mutation(api.admin.addPhoto, { ...slot, publicId, version: 42 });
+    await admin.mutation(api.admin.addPhoto, { ...slot, publicId, version: 43 }); // re-import replaces
+    const photos = await t.query(api.catalog.variantPhotos, { productId: slot.productId, modelId: slot.modelId, colorId: slot.colorId });
+    expect(photos).toHaveLength(1);
+    expect(photos[0].url).toBe(`https://res.cloudinary.com/demo-cloud/image/upload/f_auto,q_auto,c_limit,w_1200/v43/${publicId}`);
+    expect(photos[0].thumbUrl).toContain(",w_200/v43/");
   });
 });
