@@ -217,3 +217,64 @@ describe("photos on Cloudinary", () => {
     expect(photos[0].thumbUrl).toContain(",w_200/v43/");
   });
 });
+
+describe("photo assistant", () => {
+  test("article × color photos show for every model; a model's own photos win", async () => {
+    const { t, variant } = await setup();
+    const admin = await userWith(t, "admin", "approved");
+    const sid = await t.run((ctx) => ctx.storage.store(new Blob(["x"], { type: "image/webp" })));
+    await admin.mutation(api.admin.addPhoto, { productId: variant.productId, colorId: variant.colorId, position: 1, storageId: sid });
+
+    const others = await t.run((ctx) =>
+      ctx.db.query("variants").withIndex("by_product", (q) => q.eq("productId", variant.productId)).collect(),
+    );
+    const sameColor = others.filter((x) => x.colorId === variant.colorId);
+    expect(sameColor.length).toBeGreaterThan(1);
+    for (const x of sameColor) {
+      const photos = await t.query(api.catalog.variantPhotos, { productId: x.productId, modelId: x.modelId, colorId: x.colorId });
+      expect(photos).toHaveLength(1);
+    }
+
+    const own = await t.run((ctx) => ctx.storage.store(new Blob(["y"], { type: "image/webp" })));
+    await admin.mutation(api.admin.addPhoto, { productId: variant.productId, modelId: variant.modelId, colorId: variant.colorId, position: 1, storageId: own });
+    const mine = await t.query(api.catalog.variantPhotos, { productId: variant.productId, modelId: variant.modelId, colorId: variant.colorId });
+    expect(mine).toHaveLength(1);
+    expect(mine[0]._id).not.toBe((await t.query(api.catalog.variantPhotos, { productId: sameColor[1].productId, modelId: sameColor[1].modelId, colorId: sameColor[1].colorId }))[0]._id);
+  });
+
+  test("checklist lists each color with Face / Dos / Profil, and removing a photo empties its slot", async () => {
+    const { t, variant } = await setup();
+    const admin = await userWith(t, "admin", "approved");
+    const sid = await t.run((ctx) => ctx.storage.store(new Blob(["x"], { type: "image/webp" })));
+    await admin.mutation(api.admin.addPhoto, { productId: variant.productId, colorId: variant.colorId, position: 1, storageId: sid });
+
+    const list = await admin.query(api.admin.photoChecklist, { productId: variant.productId });
+    expect(list).toHaveLength(5);
+    const row = list.find((c) => c.colorId === variant.colorId)!;
+    expect(row.slots.map((s) => s.label)).toEqual(["Face", "Dos", "Profil"]);
+    expect(row.slots[0].photoId).not.toBeNull();
+    expect(row.slots[1].photoId).toBeNull();
+
+    await admin.mutation(api.admin.removePhoto, { photoId: row.slots[0].photoId! });
+    const after = await admin.query(api.admin.photoChecklist, { productId: variant.productId });
+    expect(after.find((c) => c.colorId === variant.colorId)!.slots[0].photoId).toBeNull();
+
+    const reseller = await userWith(t, "reseller", "approved");
+    await expect(reseller.query(api.admin.photoChecklist, { productId: variant.productId })).rejects.toThrow(/administration/);
+  });
+
+  test("adding a color to an article creates it for every model with stock 0", async () => {
+    const { t, variant } = await setup();
+    const admin = await userWith(t, "admin", "approved");
+    const colorId = await admin.mutation(api.admin.addColorToProduct, { productId: variant.productId, name: "Lavande", hex: "#C8B6FF" });
+    const variants = await t.run((ctx) =>
+      ctx.db.query("variants").withIndex("by_product", (q) => q.eq("productId", variant.productId)).collect(),
+    );
+    const models = new Set(variants.map((x) => x.modelId));
+    const lavande = variants.filter((x) => x.colorId === colorId);
+    expect(lavande).toHaveLength(models.size);
+    expect(lavande.every((x) => x.stock === 0)).toBe(true);
+    // Same name again reuses the color instead of duplicating it.
+    expect(await admin.mutation(api.admin.addColorToProduct, { productId: variant.productId, name: "lavande", hex: "#C8B6FF" })).toBe(colorId);
+  });
+});

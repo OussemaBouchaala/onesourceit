@@ -151,16 +151,20 @@ export const products = query({
   },
 });
 
-/** Photos for one model + color of a product, in file-name order. */
+/**
+ * Photos for one model + color of a product, in slot order (face, dos,
+ * profil). Photos made for that exact model win; otherwise the article ×
+ * color photos are shown for every model.
+ */
 export const variantPhotos = query({
   args: { productId: v.id("products"), modelId: v.id("models"), colorId: v.id("colors") },
   handler: async (ctx, { productId, modelId, colorId }) => {
-    const rows = await ctx.db
+    const all = await ctx.db
       .query("photos")
-      .withIndex("by_variant", (q) =>
-        q.eq("productId", productId).eq("modelId", modelId).eq("colorId", colorId),
-      )
+      .withIndex("by_product_color", (q) => q.eq("productId", productId).eq("colorId", colorId))
       .collect();
+    const own = all.filter((p) => p.modelId === modelId);
+    const rows = own.length > 0 ? own : all.filter((p) => p.modelId === undefined);
     const out = await Promise.all(
       rows.map(async (r) => ({
         _id: r._id,

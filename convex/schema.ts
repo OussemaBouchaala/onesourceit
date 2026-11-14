@@ -78,12 +78,14 @@ export default defineSchema({
     .index("by_product", ["productId"])
     .index("by_product_model_color", ["productId", "modelId", "colorId"]),
 
-  // Product photos per model + color, e.g. samsung_galaxy-a15_noir_1.jpg.
+  // Product photos per article + color, shown for every model in that
+  // color. A photo with modelId is specific to that model and wins over the
+  // shared ones. position: 1 = face (required), 2 = dos, 3 = profil, 4+ extra.
   photos: defineTable({
     productId: v.id("products"),
-    modelId: v.id("models"),
+    modelId: v.optional(v.id("models")),
     colorId: v.id("colors"),
-    position: v.number(), // the _N in the file name
+    position: v.number(),
     // Cloudinary (production): public id + version, original kept full size.
     publicId: v.optional(v.string()),
     version: v.optional(v.number()),
@@ -91,6 +93,7 @@ export default defineSchema({
     storageId: v.optional(v.id("_storage")),
   })
     .index("by_variant", ["productId", "modelId", "colorId", "position"])
+    .index("by_product_color", ["productId", "colorId", "position"])
     .index("by_product", ["productId"]),
 
   // Wholesale prices live in their own table and are only read through

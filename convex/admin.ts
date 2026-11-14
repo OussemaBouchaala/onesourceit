@@ -8,6 +8,7 @@ import {
   cloudinarySignature,
   getSetting,
   photoPublicId,
+  photoUrl,
   requireAdmin,
   variantLabel,
 } from "./lib";
@@ -345,7 +346,7 @@ export const assertAdmin = internalQuery({
 export const signPhotoUpload = action({
   args: {
     productId: v.id("products"),
-    modelId: v.id("models"),
+    modelId: v.optional(v.id("models")),
     colorId: v.id("colors"),
     position: v.number(),
   },
@@ -384,7 +385,7 @@ function checkPosition(position: number) {
 export const addPhoto = mutation({
   args: {
     productId: v.id("products"),
-    modelId: v.id("models"),
+    modelId: v.optional(v.id("models")),
     colorId: v.id("colors"),
     position: v.number(),
     storageId: v.optional(v.id("_storage")),
@@ -434,6 +435,7 @@ export const addPhoto = mutation({
   },
 });
 
+/** Photos per variant (model + color): its own photos plus the shared article × color ones. */
 export const photoCounts = query({
   args: { productId: v.id("products") },
   handler: async (ctx, { productId }) => {
@@ -442,12 +444,108 @@ export const photoCounts = query({
       .query("photos")
       .withIndex("by_product", (q) => q.eq("productId", productId))
       .collect();
+    const variants = await ctx.db
+      .query("variants")
+      .withIndex("by_product", (q) => q.eq("productId", productId))
+      .collect();
     const counts: Record<string, number> = {};
-    for (const p of photos) {
-      const key = `${p.modelId}_${p.colorId}`;
-      counts[key] = (counts[key] ?? 0) + 1;
+    for (const x of variants) {
+      counts[`${x.modelId}_${x.colorId}`] = photos.filter(
+        (p) => p.colorId === x.colorId && (p.modelId === undefined || p.modelId === x.modelId),
+      ).length;
     }
     return counts;
+  },
+});
+
+const PHOTO_SLOTS = [
+  { position: 1, label: "Face", required: true },
+  { position: 2, label: "Dos", required: false },
+  { position: 3, label: "Profil", required: false },
+] as const;
+
+/**
+ * The photo assistant's shot list for one article: every color it comes in,
+ * with the shared Face / Dos / Profil slots and what's already taken.
+ */
+export const photoChecklist = query({
+  args: { productId: v.id("products") },
+  handler: async (ctx, { productId }) => {
+    await requireAdmin(ctx);
+    const variants = await ctx.db
+      .query("variants")
+      .withIndex("by_product", (q) => q.eq("productId", productId))
+      .collect();
+    const colorIds = [...new Set(variants.filter((x) => x.isActive).map((x) => x.colorId))];
+    const colors = (await Promise.all(colorIds.map((id) => ctx.db.get(id))))
+      .filter((c) => c !== null)
+      .sort((a, b) => a.sort - b.sort);
+    return Promise.all(
+      colors.map(async (c) => {
+        const photos = (
+          await ctx.db
+            .query("photos")
+            .withIndex("by_product_color", (q) => q.eq("productId", productId).eq("colorId", c._id))
+            .collect()
+        ).filter((p) => p.modelId === undefined);
+        return {
+          colorId: c._id,
+          name: c.name,
+          hex: c.hex,
+          slots: await Promise.all(
+            PHOTO_SLOTS.map(async (slot) => {
+              const photo = photos.find((p) => p.position === slot.position);
+              return {
+                ...slot,
+                photoId: photo?._id ?? null,
+                thumbUrl: photo ? await photoUrl(ctx, photo, 300) : null,
+                url: photo ? await photoUrl(ctx, photo, 1200) : null,
+              };
+            }),
+          ),
+        };
+      }),
+    );
+  },
+});
+
+export const removePhoto = mutation({
+  args: { photoId: v.id("photos") },
+  handler: async (ctx, { photoId }) => {
+    await requireAdmin(ctx);
+    const photo = await ctx.db.get(photoId);
+    if (!photo) return;
+    if (photo.storageId) await ctx.storage.delete(photo.storageId);
+    await ctx.db.delete(photoId);
+  },
+});
+
+/**
+ * Adds a color to an article: finds or creates the color, then creates the
+ * variant for every model the article already has, with stock 0 (hidden on
+ * the site until stock is set in Produits & stock).
+ */
+export const addColorToProduct = mutation({
+  args: { productId: v.id("products"), name: v.string(), hex: v.string() },
+  handler: async (ctx, { productId, name, hex }) => {
+    await requireAdmin(ctx);
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) throw new ConvexError("Couleur invalide.");
+    const clean = name.trim();
+    if (clean.length < 1 || clean.length > 40) throw new ConvexError("Nom de couleur invalide.");
+    const all = await ctx.db.query("colors").collect();
+    const existing = all.find((c) => c.name.toLowerCase() === clean.toLowerCase());
+    const colorId = existing?._id ?? (await ctx.db.insert("colors", { name: clean, hex, sort: all.length + 1 }));
+    const variants = await ctx.db
+      .query("variants")
+      .withIndex("by_product", (q) => q.eq("productId", productId))
+      .collect();
+    const modelIds = [...new Set(variants.map((x) => x.modelId))];
+    if (modelIds.length === 0) throw new ConvexError("Ajoutez d'abord un modèle à cet article.");
+    for (const modelId of modelIds) {
+      const has = variants.find((x) => x.modelId === modelId && x.colorId === colorId);
+      if (!has) await ctx.db.insert("variants", { productId, modelId, colorId, stock: 0, isActive: true });
+    }
+    return colorId;
   },
 });
 
