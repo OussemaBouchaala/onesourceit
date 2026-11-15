@@ -59,4 +59,5 @@ export const CONTACT = {
   phoneHref: "tel:+21621050742",
   whatsappDisplay: "+216 22 213 001",
   email: "contact@onesourceit.shop",
+  mapsQuery: "Avenue des Martyrs, Sfax Médina, 3000 Sfax, Tunisie",
 };
