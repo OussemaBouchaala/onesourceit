@@ -104,7 +104,9 @@ export default function HomePage() {
             Ancrés à <em className="text-red-text">Sfax</em>
           </h2>
           <p className="m-0 text-[17px] leading-relaxed text-soft">
-            [PRÉSENTATION DE L&apos;ENTREPRISE — 2 à 3 phrases fournies par le client.]
+            ONEsource IT fournit les boutiques de téléphonie de toute la Tunisie en coques, protections et
+            accessoires pour les modèles les plus vendus. Notre stock est à Sfax : les revendeurs commandent en
+            gros au prix professionnel, les particuliers achètent au détail, et tout le monde paie à la livraison.
           </p>
         </div>
         <address className="flex min-w-0 flex-[1_1_380px] flex-col gap-[18px] rounded-3xl border border-line bg-card p-[clamp(20px,5vw,32px)] text-base not-italic">
@@ -129,8 +131,22 @@ export default function HomePage() {
               Nous écrire sur WhatsApp
             </a>
           </Button>
-          <div className="flex h-[200px] items-center justify-center rounded-2xl border border-dashed border-line-strong text-center text-sm text-muted">
-            [CARTE — lien Google Maps fourni par le client]
+          <div className="overflow-hidden rounded-2xl border border-line">
+            <iframe
+              title="Plan d'accès ONEsource IT à Sfax"
+              src={`https://www.google.com/maps?q=${encodeURIComponent(CONTACT.mapsQuery)}&output=embed`}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              className="block h-[220px] w-full border-0"
+            />
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(CONTACT.mapsQuery)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex min-h-11 items-center justify-center border-t border-line text-sm font-semibold"
+            >
+              Ouvrir dans Google Maps
+            </a>
           </div>
         </address>
       </section>

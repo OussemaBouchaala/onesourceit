@@ -32,7 +32,7 @@ export const run = internalMutation({
     const productId = await ctx.db.insert("products", {
       name: "Coque silicone soft-touch",
       slug: "coque-silicone-soft-touch",
-      description: "[DESCRIPTION PRODUIT — à fournir par le client]",
+      description: "Coque en silicone au toucher doux, qui protège des chocs et des rayures sans alourdir le téléphone. Intérieur en microfibre, bords surélevés pour l'écran et la caméra, découpes précises pour boutons et ports.",
       retailPrice: 20000,
       isActive: true,
     });
