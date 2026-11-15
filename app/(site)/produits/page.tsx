@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { ProductList } from "@/components/configurator/product-list";
 import { Eyebrow } from "@/components/site/eyebrow";
 
@@ -16,7 +17,9 @@ export default function ProductsPage() {
           Choisissez une gamme, puis la marque, le modèle et la couleur.
         </p>
       </div>
-      <ProductList />
+      <Suspense fallback={<div className="h-[360px] max-w-sm animate-pulse rounded-3xl bg-card" />}>
+        <ProductList />
+      </Suspense>
     </main>
   );
 }

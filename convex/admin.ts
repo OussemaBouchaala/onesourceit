@@ -1,4 +1,4 @@
-import { action, internalQuery, mutation, query } from "./_generated/server";
+import { action, internalQuery, mutation, query, type MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
@@ -225,10 +225,15 @@ export const catalog = query({
             .query("variants")
             .withIndex("by_product", (q) => q.eq("productId", p._id))
             .collect();
+          const photos = await ctx.db
+            .query("photos")
+            .withIndex("by_product", (q) => q.eq("productId", p._id))
+            .collect();
           return {
             _id: p._id,
             name: p.name,
             slug: p.slug,
+            description: p.description,
             isActive: p.isActive,
             imageUrl: p.imageId ? await ctx.storage.getUrl(p.imageId) : null,
             retailPrice: p.retailPrice,
@@ -240,6 +245,9 @@ export const catalog = query({
                 colorId: x.colorId,
                 stock: x.stock,
                 isActive: x.isActive,
+                photoCount: photos.filter(
+                  (ph) => ph.colorId === x.colorId && (ph.modelId === undefined || ph.modelId === x.modelId),
+                ).length,
                 ...(await variantLabel(ctx, x)),
               })),
             ),
@@ -568,6 +576,65 @@ export const removePhoto = mutation({
  * variant for every model the article already has, with stock 0 (hidden on
  * the site until stock is set in Produits & stock).
  */
+export const addBrand = mutation({
+  args: { name: v.string() },
+  handler: async (ctx, { name }) => {
+    await requireAdmin(ctx);
+    const clean = name.trim();
+    if (clean.length < 1 || clean.length > 40) throw new ConvexError("Nom de marque invalide.");
+    const all = await ctx.db.query("brands").collect();
+    if (all.some((b) => norm(b.name) === norm(clean))) throw new ConvexError("Cette marque existe déjà.");
+    return ctx.db.insert("brands", { name: clean, sort: all.length + 1 });
+  },
+});
+
+async function uniqueSlug(ctx: MutationCtx, name: string, except?: Id<"products">) {
+  const base = slugify(name) || "article";
+  for (let i = 1; ; i++) {
+    const slug = i === 1 ? base : `${base}-${i}`;
+    const hit = await ctx.db.query("products").withIndex("by_slug", (q) => q.eq("slug", slug)).unique();
+    if (!hit || hit._id === except) return slug;
+  }
+}
+
+function checkProductText(name: string, description: string) {
+  const n = name.trim();
+  if (n.length < 2 || n.length > 80) throw new ConvexError("Nom d'article invalide (2 à 80 caractères).");
+  if (description.trim().length > 2000) throw new ConvexError("Description trop longue.");
+  return { name: n, description: description.trim() };
+}
+
+/** A new article (gamme), active right away. Variants are added afterwards. */
+export const createProduct = mutation({
+  args: { name: v.string(), description: v.string(), retailPrice: price, wholesalePrice: price },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const { name, description } = checkProductText(args.name, args.description);
+    checkPrice(args.retailPrice);
+    checkPrice(args.wholesalePrice);
+    const all = await ctx.db.query("products").collect();
+    if (all.some((p) => norm(p.name) === norm(name))) throw new ConvexError("Un article porte déjà ce nom.");
+    const productId = await ctx.db.insert("products", {
+      name, description, slug: await uniqueSlug(ctx, name), retailPrice: args.retailPrice, isActive: true,
+    });
+    if (args.wholesalePrice !== null)
+      await ctx.db.insert("reseller_prices", { productId, price: args.wholesalePrice });
+    return productId;
+  },
+});
+
+/** Edits an article's name, description and visibility. The web address stays the same. */
+export const updateProduct = mutation({
+  args: { productId: v.id("products"), name: v.string(), description: v.string(), isActive: v.boolean() },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const product = await ctx.db.get(args.productId);
+    if (!product) throw new ConvexError("Article introuvable.");
+    const { name, description } = checkProductText(args.name, args.description);
+    await ctx.db.patch(args.productId, { name, description, isActive: args.isActive });
+  },
+});
+
 export const addColorToProduct = mutation({
   args: { productId: v.id("products"), name: v.string(), hex: v.string() },
   handler: async (ctx, { productId, name, hex }) => {

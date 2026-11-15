@@ -17,7 +17,7 @@ export function Footer() {
             rel="noopener noreferrer"
             className="inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-full bg-white px-5 font-semibold text-navy no-underline hover:bg-soft max-sm:self-stretch"
           >
-            <MessageCircle aria-hidden className="size-4" />Nous écrire sur WhatsApp
+            <MessageCircle aria-hidden className="size-4" />WhatsApp · {CONTACT.whatsappDisplay}
           </a>
         </div>
         <div className="flex flex-col gap-6">

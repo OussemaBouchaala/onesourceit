@@ -49,7 +49,7 @@ export const PROFILE_STATUS_LABEL = {
 } as const;
 
 export function whatsappLink(text?: string) {
-  const number = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "21621050742";
+  const number = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "21622213001";
   return `https://wa.me/${number}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
 }
 
@@ -57,5 +57,6 @@ export const CONTACT = {
   address: "Avenue des Martyrs, immeuble Ben Arab, Sfax Médina, 3000 Sfax",
   phoneDisplay: "+216 21 050 742",
   phoneHref: "tel:+21621050742",
+  whatsappDisplay: "+216 22 213 001",
   email: "contact@onesourceit.shop",
 };

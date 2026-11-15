@@ -172,6 +172,34 @@ describe("admin", () => {
   });
 });
 
+describe("catalogue editing", () => {
+  test("admin creates an article, edits it and adds a brand", async () => {
+    const { t } = await setup();
+    const admin = await userWith(t, "admin", "approved");
+    const id = await admin.mutation(api.admin.createProduct, { name: "Verre trempé 9H", description: "", retailPrice: 8000, wholesalePrice: 5000 });
+    await expect(admin.mutation(api.admin.createProduct, { name: "verre trempe 9h", description: "", retailPrice: null, wholesalePrice: null })).rejects.toThrow(/déjà/);
+    let cat = await admin.query(api.admin.catalog, {});
+    const p = cat.products.find((x) => x._id === id)!;
+    expect([p.slug, p.retailPrice, p.wholesalePrice, p.isActive]).toEqual(["verre-trempe-9h", 8000, 5000, true]);
+
+    await admin.mutation(api.admin.updateProduct, { productId: id, name: "Verre trempé 9H+", description: "Dureté 9H", isActive: false });
+    cat = await admin.query(api.admin.catalog, {});
+    expect(cat.products.find((x) => x._id === id)).toMatchObject({ name: "Verre trempé 9H+", description: "Dureté 9H", isActive: false, slug: "verre-trempe-9h" });
+    expect(await t.query(api.catalog.productPage, { slug: "verre-trempe-9h" })).toBeNull();
+
+    await admin.mutation(api.admin.addBrand, { name: "Oppo" });
+    await expect(admin.mutation(api.admin.addBrand, { name: "oppo" })).rejects.toThrow(/existe/);
+    expect((await admin.query(api.admin.catalog, {})).brands.some((b) => b.name === "Oppo")).toBe(true);
+  });
+
+  test("resellers cannot edit the catalogue", async () => {
+    const { t } = await setup();
+    const reseller = await userWith(t, "reseller", "approved");
+    await expect(reseller.mutation(api.admin.createProduct, { name: "X article", description: "", retailPrice: null, wholesalePrice: null })).rejects.toThrow(/administration/);
+    await expect(reseller.mutation(api.admin.addBrand, { name: "Oppo" })).rejects.toThrow(/administration/);
+  });
+});
+
 describe("admin team", () => {
   test("pending and refused admins have no admin access", async () => {
     const { t } = await setup();
