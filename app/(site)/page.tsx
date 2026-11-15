@@ -113,8 +113,12 @@ export default function HomePage() {
             <span>{CONTACT.address}</span>
           </div>
           <div className="flex flex-col gap-1">
-            <span className="text-[13px] tracking-[0.1em] text-muted uppercase">Téléphone / WhatsApp</span>
+            <span className="text-[13px] tracking-[0.1em] text-muted uppercase">Téléphone</span>
             <a href={CONTACT.phoneHref}>{CONTACT.phoneDisplay}</a>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[13px] tracking-[0.1em] text-muted uppercase">WhatsApp</span>
+            <a href={whatsappLink()} target="_blank" rel="noopener noreferrer">{CONTACT.whatsappDisplay}</a>
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-[13px] tracking-[0.1em] text-muted uppercase">Email</span>

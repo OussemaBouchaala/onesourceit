@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
-import { Camera, ChevronDown, Loader2, Plus, X } from "lucide-react";
+import { Camera, ChevronDown, Loader2, Plus, X, ImageUp } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
@@ -169,6 +169,22 @@ export function PhotoAssistant() {
                         type="file"
                         accept="image/*"
                         capture="environment"
+                        className="sr-only"
+                        disabled={loading}
+                        onChange={(e) => { void take(c.colorId, s.position, e.target.files?.[0]); e.target.value = ""; }}
+                      />
+                      {/* Same slot, but opens the gallery / files instead of the camera. */}
+                      <label
+                        htmlFor={`${inputId}-file`}
+                        className="mt-1.5 flex min-h-9 cursor-pointer items-center justify-center gap-1 rounded-full border border-line-strong text-xs font-semibold text-soft hover:bg-navy"
+                      >
+                        <ImageUp aria-hidden className="size-3.5" />Galerie
+                        <span className="sr-only">: choisir une photo existante {s.label} — {c.name}</span>
+                      </label>
+                      <input
+                        id={`${inputId}-file`}
+                        type="file"
+                        accept="image/*"
                         className="sr-only"
                         disabled={loading}
                         onChange={(e) => { void take(c.colorId, s.position, e.target.files?.[0]); e.target.value = ""; }}
