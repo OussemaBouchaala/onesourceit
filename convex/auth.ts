@@ -48,6 +48,9 @@ function signUpProfile(params: Record<string, unknown>) {
     throw new ConvexError("Ville invalide.");
   if (fields.address.length < 4 || fields.address.length > 200)
     throw new ConvexError("Adresse invalide.");
+  // Matricule fiscal and RNE are optional; only their length is checked.
+  if ((fields.taxId?.length ?? 0) > 40 || (fields.rne?.length ?? 0) > 40)
+    throw new ConvexError("Matricule fiscal ou RNE trop long.");
   return { email, ...fields, phone: fields.phone, whatsapp: fields.whatsapp ?? undefined };
 }
 

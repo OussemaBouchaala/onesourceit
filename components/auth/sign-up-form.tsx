@@ -77,8 +77,8 @@ export function SignUpForm() {
             {ACTIVITY_TYPES.map((a) => <option key={a}>{a}</option>)}
           </NativeSelect>
         </Label>
-        <Label>Matricule fiscal<Input name="taxId" maxLength={40} placeholder="0000000/A/M/000" /></Label>
-        <Label>Registre de commerce (RNE)<Input name="rne" maxLength={40} placeholder="Optionnel" /></Label>
+        <Label>Matricule fiscal <span className="font-normal text-muted">(facultatif)</span><Input name="taxId" maxLength={40} placeholder="0000000/A/M/000" /></Label>
+        <Label>Registre de commerce (RNE) <span className="font-normal text-muted">(facultatif)</span><Input name="rne" maxLength={40} placeholder="Ex. 1234567A" /></Label>
       </fieldset>
 
       <fieldset className={grid}>
