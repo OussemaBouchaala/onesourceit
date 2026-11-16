@@ -12,11 +12,15 @@ export const profileStatus = v.union(
   v.literal("approved"),
   v.literal("refused"),
 );
+// See convex/rules.ts for what each status means and the allowed moves.
 export const orderStatus = v.union(
   v.literal("new"),
   v.literal("confirmed"),
+  v.literal("ready"),
   v.literal("shipped"),
   v.literal("delivered"),
+  v.literal("settled"),
+  v.literal("returned"),
   v.literal("cancelled"),
 );
 export const shippingMethod = v.union(v.literal("home"), v.literal("pickup"));
@@ -125,6 +129,11 @@ export default defineSchema({
     itemCount: v.number(),
     status: orderStatus,
     note: v.optional(v.string()),
+    // Cash on delivery follow-up, written by admins only.
+    cancelReason: v.optional(v.string()),
+    courierName: v.optional(v.string()),
+    trackingNumber: v.optional(v.string()),
+    history: v.optional(v.array(v.object({ status: orderStatus, at: v.number() }))),
   })
     .index("by_ref", ["ref"])
     .index("by_public_id", ["publicId"])
@@ -139,9 +148,10 @@ export default defineSchema({
     unitPrice: v.number(), // copied at order time
   }).index("by_order", ["orderId"]),
 
-  // Shop settings editable in admin: delivery fee, order counter.
+  // Shop settings editable in admin: delivery fee, free-delivery threshold,
+  // courier name and contact, order counter.
   settings: defineTable({
     key: v.string(),
-    value: v.union(v.number(), v.null()),
+    value: v.union(v.number(), v.string(), v.null()),
   }).index("by_key", ["key"]),
 });

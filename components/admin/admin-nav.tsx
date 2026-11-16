@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import {
-  ArrowLeft, Boxes, Camera, CircleHelp, ClipboardList, LayoutDashboard, LogOut, Menu, Store, Tags, Upload, Users, X,
+  ArrowLeft, Boxes, Camera, CircleHelp, ClipboardList, LayoutDashboard, LogOut, Menu, Store, Tags, Truck, Upload, Users, X,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Logo } from "@/components/site/logo";
@@ -40,6 +40,7 @@ export function AdminNav() {
   const tabs = [
     { href: "/admin", label: "Tableau de bord", icon: LayoutDashboard, badge: 0 },
     { href: "/admin/commandes", label: "Commandes", icon: ClipboardList, badge: stats?.newOrders ?? 0 },
+    { href: "/admin/livraison", label: "Livraison", icon: Truck, badge: 0 },
     { href: "/admin/revendeurs", label: "Revendeurs", icon: Store, badge: stats?.pendingResellers ?? 0 },
     { href: "/admin/articles", label: "Articles", icon: Tags, badge: 0 },
     { href: "/admin/produits", label: "Produits & stock", icon: Boxes, badge: 0 },

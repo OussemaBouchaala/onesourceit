@@ -45,7 +45,7 @@ export default function AdminHome() {
       <section aria-labelledby="todo" className="flex flex-col gap-3">
         <h2 id="todo" className="m-0 font-display text-[13px] tracking-[0.12em] text-red-text uppercase">À faire</h2>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(min(280px,100%),1fr))] gap-3">
-          <Todo href="/admin/commandes" title="Nouvelles commandes" sub="À confirmer par téléphone" n={s?.newOrders} />
+          <Todo href="/admin/commandes" title="Commandes à confirmer" sub="Appeler ou écrire sur WhatsApp" n={s?.newOrders} />
           <Todo href="/admin/revendeurs" title="Revendeurs à valider" sub="Vérifier la boutique" n={s?.pendingResellers} />
           {me?.isSuperAdmin && <Todo href="/admin/equipe" title="Demandes d'accès admin" sub="À valider ou refuser" n={s?.pendingAdmins} />}
         </div>

@@ -1,18 +1,21 @@
-import { action, internalQuery, mutation, query, type MutationCtx } from "./_generated/server";
+import { action, internalQuery, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
 import { orderStatus, priceType, profileStatus } from "./schema";
 import {
   cloudinaryConfig,
   cloudinarySignature,
   getSetting,
+  getTextSetting,
   photoPublicId,
   photoUrl,
   requireAdmin,
+  putSetting,
   requireSuperAdmin,
   variantLabel,
 } from "./lib";
+import { normalizeTnPhone, nextStatuses, RESTOCKED } from "./rules";
 
 const price = v.union(v.number(), v.null());
 function checkPrice(p: number | null) {
@@ -42,36 +45,61 @@ export const dashboard = query({
 // ---------- Orders ----------
 
 export const orders = query({
-  args: { status: v.optional(orderStatus), priceType: v.optional(priceType) },
+  args: { statuses: v.optional(v.array(orderStatus)), priceType: v.optional(priceType) },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    const rows = args.status
-      ? await ctx.db
-          .query("orders")
-          .withIndex("by_status", (q) => q.eq("status", args.status!))
-          .order("desc")
-          .take(200)
+    const rows = args.statuses
+      ? (
+          await Promise.all(
+            args.statuses.map((status) =>
+              ctx.db
+                .query("orders")
+                .withIndex("by_status", (q) => q.eq("status", status))
+                .order("desc")
+                .take(200),
+            ),
+          )
+        )
+          .flat()
+          .sort((a, b) => b._creationTime - a._creationTime)
+          .slice(0, 200)
       : await ctx.db.query("orders").order("desc").take(200);
-    return rows
-      .filter((o) => !args.priceType || o.priceType === args.priceType)
-      .map((o) => ({
-        _id: o._id,
-        ref: o.ref,
-        createdAt: o._creationTime,
-        customerName: o.customerName,
-        phone: o.phone,
-        governorate: o.governorate ?? null,
-        city: o.city ?? null,
-        address: o.address ?? null,
-        note: o.note ?? null,
-        priceType: o.priceType,
-        itemCount: o.itemCount,
-        total: o.total,
-        shippingMethod: o.shippingMethod,
-        status: o.status,
-      }));
+    return Promise.all(
+      rows
+        .filter((o) => !args.priceType || o.priceType === args.priceType)
+        .map(async (o) => ({
+          _id: o._id,
+          ref: o.ref,
+          createdAt: o._creationTime,
+          customerName: o.customerName,
+          phone: o.phone,
+          governorate: o.governorate ?? null,
+          city: o.city ?? null,
+          address: o.address ?? null,
+          note: o.note ?? null,
+          priceType: o.priceType,
+          itemCount: o.itemCount,
+          itemsSummary: await itemsSummary(ctx, o._id),
+          total: o.total,
+          shippingMethod: o.shippingMethod,
+          status: o.status,
+          next: nextStatuses(o.status, o.shippingMethod),
+          cancelReason: o.cancelReason ?? null,
+          courierName: o.courierName ?? null,
+          trackingNumber: o.trackingNumber ?? null,
+        })),
+    );
   },
 });
+
+/** "2 × Samsung Galaxy A15 · Noir, 1 × …" */
+async function itemsSummary(ctx: QueryCtx, orderId: Id<"orders">) {
+  const items = await ctx.db
+    .query("order_items")
+    .withIndex("by_order", (q) => q.eq("orderId", orderId))
+    .collect();
+  return items.map((i) => `${i.qty} × ${i.label}`).join(", ");
+}
 
 export const orderItems = query({
   args: { orderId: v.id("orders") },
@@ -85,20 +113,51 @@ export const orderItems = query({
   },
 });
 
+/**
+ * Moves an order along the cash-on-delivery lifecycle (see rules.ts).
+ * Only allowed moves pass. Cancelled and returned orders put their pieces
+ * back in stock; reopening a cancelled order takes them again.
+ */
 export const setOrderStatus = mutation({
-  args: { orderId: v.id("orders"), status: orderStatus },
-  handler: async (ctx, { orderId, status }) => {
+  args: {
+    orderId: v.id("orders"),
+    status: orderStatus,
+    reason: v.optional(v.string()),
+    courierName: v.optional(v.string()),
+    trackingNumber: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    const order = await ctx.db.get(orderId);
+    const order = await ctx.db.get(args.orderId);
     if (!order) throw new ConvexError("Commande introuvable.");
+    const { status } = args;
     if (order.status === status) return;
-    // Cancelling puts the pieces back in stock; un-cancelling takes them again.
-    const delta =
-      status === "cancelled" ? 1 : order.status === "cancelled" ? -1 : 0;
+    if (!nextStatuses(order.status, order.shippingMethod).includes(status))
+      throw new ConvexError("Ce changement de statut n'est pas possible pour cette commande.");
+
+    const patch: Partial<Doc<"orders">> = { status };
+    if (status === "cancelled") {
+      const reason = args.reason?.trim().slice(0, 300);
+      if (!reason) throw new ConvexError("Indiquez la raison de l'annulation.");
+      patch.cancelReason = reason;
+    }
+    if (status === "returned" && args.reason?.trim()) patch.cancelReason = args.reason.trim().slice(0, 300);
+    if (status === "new") patch.cancelReason = undefined;
+    if (status === "shipped") {
+      const courierName =
+        args.courierName?.trim().slice(0, 80) || (await getTextSetting(ctx, "courierName")) || undefined;
+      if (!courierName) throw new ConvexError("Indiquez le livreur.");
+      patch.courierName = courierName;
+      patch.trackingNumber = args.trackingNumber?.trim().slice(0, 60) || undefined;
+    }
+
+    const wasRestocked = RESTOCKED.includes(order.status);
+    const isRestocked = RESTOCKED.includes(status);
+    const delta = isRestocked && !wasRestocked ? 1 : wasRestocked && !isRestocked ? -1 : 0;
     if (delta !== 0) {
       const items = await ctx.db
         .query("order_items")
-        .withIndex("by_order", (q) => q.eq("orderId", orderId))
+        .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
         .collect();
       for (const i of items) {
         const variant = await ctx.db.get(i.variantId);
@@ -108,7 +167,100 @@ export const setOrderStatus = mutation({
         await ctx.db.patch(variant._id, { stock });
       }
     }
-    await ctx.db.patch(orderId, { status });
+    patch.history = [
+      ...(order.history ?? [{ status: "new" as const, at: order._creationTime }]),
+      { status, at: Date.now() },
+    ];
+    await ctx.db.patch(args.orderId, patch);
+  },
+});
+
+/**
+ * Cash summary. "With the courier" = delivered, not yet paid to the shop.
+ * Return rate = returned ÷ (delivered + settled + returned), home orders only.
+ */
+export const codSummary = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    const byStatus = async (status: Doc<"orders">["status"]) =>
+      ctx.db.query("orders").withIndex("by_status", (q) => q.eq("status", status)).collect();
+    const [delivered, settled, returned] = await Promise.all([
+      byStatus("delivered"),
+      byStatus("settled"),
+      byStatus("returned"),
+    ]);
+    const sum = (rows: Doc<"orders">[]) => rows.reduce((a, o) => a + o.total, 0);
+    const outcomes =
+      delivered.length + settled.filter((o) => o.shippingMethod === "home").length + returned.length;
+    return {
+      withCourier: sum(delivered),
+      withCourierCount: delivered.length,
+      settled: sum(settled),
+      returnRate: outcomes ? returned.length / outcomes : null,
+    };
+  },
+});
+
+/** Confirmed home-delivery orders, for the courier's CSV. */
+export const courierExport = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    const rows = await ctx.db
+      .query("orders")
+      .withIndex("by_status", (q) => q.eq("status", "confirmed"))
+      .collect();
+    return Promise.all(
+      rows
+        .filter((o) => o.shippingMethod === "home")
+        .map(async (o) => ({
+          ref: o.ref,
+          customerName: o.customerName,
+          phone: o.phone.replace(/^\+216/, ""),
+          governorate: o.governorate ?? "",
+          city: o.city ?? "",
+          address: o.address ?? "",
+          products: await itemsSummary(ctx, o._id),
+          codAmount: o.total,
+        })),
+    );
+  },
+});
+
+// ---------- Delivery settings ----------
+
+export const deliverySettings = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return {
+      fee: await getSetting(ctx, "deliveryFee"),
+      freeFrom: await getSetting(ctx, "freeDeliveryFrom"),
+      courierName: await getTextSetting(ctx, "courierName"),
+      courierPhone: await getTextSetting(ctx, "courierPhone"),
+    };
+  },
+});
+
+export const saveDeliverySettings = mutation({
+  args: {
+    fee: price,
+    freeFrom: price,
+    courierName: v.string(),
+    courierPhone: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    checkPrice(args.fee);
+    checkPrice(args.freeFrom);
+    const courierPhone = args.courierPhone.trim();
+    if (courierPhone && !normalizeTnPhone(courierPhone))
+      throw new ConvexError("Téléphone du livreur invalide.");
+    await putSetting(ctx, "deliveryFee", args.fee);
+    await putSetting(ctx, "freeDeliveryFrom", args.freeFrom);
+    await putSetting(ctx, "courierName", args.courierName.trim().slice(0, 80) || null);
+    await putSetting(ctx, "courierPhone", courierPhone ? normalizeTnPhone(courierPhone) : null);
   },
 });
 
@@ -339,12 +491,7 @@ export const setDeliveryFee = mutation({
   handler: async (ctx, { fee }) => {
     await requireAdmin(ctx);
     checkPrice(fee);
-    const row = await ctx.db
-      .query("settings")
-      .withIndex("by_key", (q) => q.eq("key", "deliveryFee"))
-      .unique();
-    if (row) await ctx.db.patch(row._id, { value: fee });
-    else await ctx.db.insert("settings", { key: "deliveryFee", value: fee });
+    await putSetting(ctx, "deliveryFee", fee);
   },
 });
 

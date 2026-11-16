@@ -6,7 +6,8 @@ import { Check } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Steps } from "./steps";
 import { Button } from "@/components/ui/button";
-import { ORDER_STATUS_LABEL, formatDT, formatDate, whatsappLink } from "@/lib/format";
+import { formatDT, formatDate, whatsappLink } from "@/lib/format";
+import { OrderTimeline } from "./order-timeline";
 
 export function OrderConfirmation({ publicId }: { publicId: string }) {
   const order = useQuery(api.orders.byPublicId, { publicId });
@@ -45,7 +46,14 @@ export function OrderConfirmation({ publicId }: { publicId: string }) {
               <span>{formatDT(order.total)}</span>
             </li>
           </ul>
-          <p className="m-0 text-sm text-muted">Statut : {ORDER_STATUS_LABEL[order.status]}. Gardez ce lien pour suivre votre commande.</p>
+          <OrderTimeline
+            status={order.status}
+            history={order.history}
+            pickup={order.shippingMethod === "pickup"}
+            courierName={order.courierName}
+            trackingNumber={order.trackingNumber}
+          />
+          <p className="m-0 text-sm text-muted">Gardez ce lien pour suivre votre commande.</p>
           <div className="flex w-full flex-wrap gap-2.5">
             <Button asChild variant="success" className="flex-[1_1_220px]">
               <a href={whatsappLink(`Bonjour, je vous contacte au sujet de ma commande #${order.ref}.`)} target="_blank" rel="noopener noreferrer">

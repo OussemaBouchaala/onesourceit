@@ -39,7 +39,7 @@ function signUpProfile(params: Record<string, unknown>) {
   if (fields.fullName.length < 2 || fields.fullName.length > 120)
     throw new ConvexError("Nom et prénom invalides.");
   if (!fields.phone)
-    throw new ConvexError("Téléphone invalide (format +216 suivi de 8 chiffres).");
+    throw new ConvexError("Téléphone invalide : 8 chiffres commençant par 2, 4, 5, 7 ou 9.");
   if (fields.whatsapp === null)
     throw new ConvexError("Numéro WhatsApp invalide.");
   if (!(GOVERNORATES as readonly string[]).includes(fields.governorate))
@@ -67,7 +67,7 @@ function adminSignUpProfile(params: Record<string, unknown>) {
   if (fullName.length < 2 || fullName.length > 120)
     throw new ConvexError("Nom et prénom invalides.");
   if (!phone)
-    throw new ConvexError("Téléphone invalide (format +216 suivi de 8 chiffres).");
+    throw new ConvexError("Téléphone invalide : 8 chiffres commençant par 2, 4, 5, 7 ou 9.");
   return { kind: "admin" as const, email, fullName, phone };
 }
 

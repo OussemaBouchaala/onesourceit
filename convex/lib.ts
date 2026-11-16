@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError } from "convex/values";
-import type { QueryCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 
 export type Viewer = {
@@ -59,12 +59,29 @@ export async function wholesalePriceFor(
   return row?.price ?? null;
 }
 
-export async function getSetting(ctx: QueryCtx, key: string) {
-  const row = await ctx.db
+async function settingRow(ctx: QueryCtx, key: string) {
+  return ctx.db
     .query("settings")
     .withIndex("by_key", (q) => q.eq("key", key))
     .unique();
-  return row?.value ?? null;
+}
+
+/** A numeric setting (amounts in millimes, counters). */
+export async function getSetting(ctx: QueryCtx, key: string): Promise<number | null> {
+  const value = (await settingRow(ctx, key))?.value;
+  return typeof value === "number" ? value : null;
+}
+
+/** A text setting (courier name, contact). */
+export async function getTextSetting(ctx: QueryCtx, key: string): Promise<string | null> {
+  const value = (await settingRow(ctx, key))?.value;
+  return typeof value === "string" ? value : null;
+}
+
+export async function putSetting(ctx: MutationCtx, key: string, value: number | string | null) {
+  const row = await settingRow(ctx, key);
+  if (row) await ctx.db.patch(row._id, { value });
+  else await ctx.db.insert("settings", { key, value });
 }
 
 export async function variantLabel(ctx: QueryCtx, v: Doc<"variants">) {

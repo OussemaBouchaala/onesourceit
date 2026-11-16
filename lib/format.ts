@@ -35,13 +35,35 @@ export function formatDate(ms: number) {
   }).format(ms);
 }
 
+/** Admin labels, in lifecycle order. */
 export const ORDER_STATUS_LABEL = {
-  new: "Nouvelle",
+  new: "À confirmer",
   confirmed: "Confirmée",
+  ready: "Prête au retrait",
   shipped: "Expédiée",
   delivered: "Livrée",
+  settled: "Encaissée",
+  returned: "Retournée",
   cancelled: "Annulée",
 } as const;
+
+/** What the customer sees. */
+export const CUSTOMER_STATUS_LABEL: Record<keyof typeof ORDER_STATUS_LABEL, string> = {
+  new: "En attente de confirmation",
+  confirmed: "Confirmée",
+  ready: "Prête au retrait",
+  shipped: "En route",
+  delivered: "Livrée",
+  settled: "Livrée",
+  returned: "Retournée",
+  cancelled: "Annulée",
+};
+
+/** "+21621050742" → "21 050 742". */
+export function displayPhone(phone: string) {
+  const d = phone.replace(/^\+216/, "");
+  return d.length === 8 ? `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5)}` : phone;
+}
 
 export const PROFILE_STATUS_LABEL = {
   pending: "En attente",

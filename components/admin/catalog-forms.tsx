@@ -21,7 +21,7 @@ const errText = (e: unknown) => (e instanceof ConvexError ? String(e.data) : "Ac
 /** Popup forms used by the Articles and Produits & stock pages. */
 type FormProps = { onClose: () => void; onDone: (msg: string) => void };
 
-function useSubmit(onDone: (msg: string) => void) {
+export function useSubmit(onDone: (msg: string) => void) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   async function run(fn: () => Promise<unknown>, msg: string) {
@@ -38,7 +38,7 @@ function useSubmit(onDone: (msg: string) => void) {
   return { error, setError, busy, run };
 }
 
-function FormFooter({ busy, error, onClose, label = "Enregistrer" }: { busy: boolean; error: string | null; onClose: () => void; label?: string }) {
+export function FormFooter({ busy, error, onClose, label = "Enregistrer" }: { busy: boolean; error: string | null; onClose: () => void; label?: string }) {
   return (
     <>
       {error && <p role="alert" className="m-0 rounded-xl bg-bad-soft px-3.5 py-3 text-sm font-medium text-bad-ink">{error}</p>}
@@ -50,7 +50,7 @@ function FormFooter({ busy, error, onClose, label = "Enregistrer" }: { busy: boo
   );
 }
 
-function MoneyField({ name, label, value }: { name: string; label: string; value: number | null }) {
+export function MoneyField({ name, label, value }: { name: string; label: string; value: number | null }) {
   return (
     <Label>{label}
       <span className="relative">

@@ -9,10 +9,15 @@ export const GUIDES: Record<string, GuideStep[]> = {
     { icon: "📷", title: "Photos et stock", text: "« Photos » vous guide pour photographier chaque couleur. « Produits & stock » sert aux prix et aux quantités." },
   ],
   "/admin/commandes": [
-    { icon: "🧾", title: "Vos commandes", text: "Chaque commande passée sur le site arrive ici. Le client paie à la livraison, en espèces." },
-    { icon: "📞", title: "Confirmez par téléphone", text: "Touchez le numéro pour appeler le client. Une fois d'accord, changez le statut en « Confirmée »." },
-    { icon: "🚚", title: "Suivez la livraison", text: "Passez ensuite à « Expédiée », puis « Livrée ». Si la commande est annulée, le stock est remis automatiquement." },
-    { icon: "🔎", title: "Voir le détail", text: "Touchez le numéro de commande pour voir les articles, l'adresse et la note du client." },
+    { icon: "🧾", title: "Vos commandes", text: "Chaque commande passée sur le site arrive dans « À confirmer ». Le client paie à la livraison, en espèces." },
+    { icon: "📞", title: "Confirmez par téléphone ou WhatsApp", text: "Touchez le numéro pour appeler, ou « WhatsApp » pour envoyer un message déjà rempli. Une fois d'accord, touchez « Confirmer »." },
+    { icon: "🚚", title: "Expédiez", text: "Dans « Confirmées », « Export CSV » prépare le fichier pour le livreur. « Expédier » demande le livreur et le numéro de suivi." },
+    { icon: "💰", title: "Encaissez", text: "Quand le colis est livré, touchez « Livrée ». Quand le livreur vous verse l'argent, touchez « Encaissée ». Le haut de la page montre l'argent encore chez le livreur." },
+    { icon: "↩️", title: "Annulé ou retourné", text: "« Annuler » (avant l'envoi) et « Retournée » (colis refusé) remettent les pièces en stock automatiquement." },
+  ],
+  "/admin/livraison": [
+    { icon: "🚚", title: "Réglages de livraison", text: "Ici seulement : le prix de la livraison, le montant à partir duquel elle est gratuite, et la société de livraison." },
+    { icon: "🎁", title: "Livraison gratuite", text: "Laissez vide pour ne jamais l'offrir. Elle ne s'applique qu'aux clients au détail." },
   ],
   "/admin/revendeurs": [
     { icon: "🏪", title: "Les revendeurs", text: "Les boutiques qui créent un compte arrivent ici « en attente ». Elles voient seulement le prix détail." },

@@ -98,6 +98,7 @@ export const priceCart = query({
   handler: async (ctx, { variantIds }) => {
     const viewer = await getViewer(ctx);
     const deliveryFee = await getSetting(ctx, "deliveryFee");
+    const freeDeliveryFrom = await getSetting(ctx, "freeDeliveryFrom");
     const lines = await Promise.all(
       variantIds.slice(0, 100).map(async (id) => {
         const variant = await ctx.db.get(id);
@@ -121,6 +122,8 @@ export const priceCart = query({
     return {
       priceType: viewer.isApproved ? ("wholesale" as const) : ("retail" as const),
       deliveryFee,
+      // Free delivery applies to retail orders only.
+      freeDeliveryFrom: viewer.isApproved ? null : freeDeliveryFrom,
       lines: lines.filter((l) => l !== null),
     };
   },

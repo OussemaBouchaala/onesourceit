@@ -1,8 +1,9 @@
 import { mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
-import { getViewer, wholesalePriceFor, getSetting, variantLabel } from "./lib";
+import { getViewer, wholesalePriceFor, getSetting, putSetting, variantLabel } from "./lib";
 import { shippingMethod } from "./schema";
 import {
+  deliveryFeeFor,
   GOVERNORATES,
   MAX_RETAIL_QTY,
   MAX_WHOLESALE_QTY,
@@ -39,7 +40,7 @@ export const placeOrder = mutation({
     if (customerName.length < 2 || customerName.length > 120)
       throw new ConvexError("Indiquez votre nom et prénom.");
     const phone = normalizeTnPhone(args.phone);
-    if (!phone) throw new ConvexError("Téléphone invalide (format +216 suivi de 8 chiffres).");
+    if (!phone) throw new ConvexError("Téléphone invalide : 8 chiffres commençant par 2, 4, 5, 7 ou 9.");
 
     let governorate: string | undefined;
     let city: string | undefined;
@@ -91,25 +92,22 @@ export const placeOrder = mutation({
       priced.push({ variant, label, qty, unitPrice });
     }
 
-    let shippingFee = 0;
-    if (args.shippingMethod === "home") {
-      const fee = await getSetting(ctx, "deliveryFee");
-      if (fee === null)
-        throw new ConvexError("Les frais de livraison ne sont pas encore définis. Choisissez le retrait à Sfax.");
-      shippingFee = fee;
-    }
-
     const subtotal = priced.reduce((sum, l) => sum + l.unitPrice * l.qty, 0);
     const itemCount = priced.reduce((sum, l) => sum + l.qty, 0);
 
+    const shippingFee = deliveryFeeFor({
+      ship: args.shippingMethod,
+      subtotal,
+      wholesale,
+      fee: await getSetting(ctx, "deliveryFee"),
+      freeFrom: await getSetting(ctx, "freeDeliveryFrom"),
+    });
+    if (shippingFee === null)
+      throw new ConvexError("Les frais de livraison ne sont pas encore définis. Choisissez le retrait à Sfax.");
+
     // Sequential human reference: OS-0001, OS-0002…
-    const counter = await ctx.db
-      .query("settings")
-      .withIndex("by_key", (q) => q.eq("key", "orderSeq"))
-      .unique();
-    const seq = (counter?.value ?? 0) + 1;
-    if (counter) await ctx.db.patch(counter._id, { value: seq });
-    else await ctx.db.insert("settings", { key: "orderSeq", value: seq });
+    const seq = ((await getSetting(ctx, "orderSeq")) ?? 0) + 1;
+    await putSetting(ctx, "orderSeq", seq);
     const ref = `OS-${String(seq).padStart(4, "0")}`;
     const publicId = crypto.randomUUID();
 
@@ -130,6 +128,7 @@ export const placeOrder = mutation({
       itemCount,
       status: "new",
       note,
+      history: [{ status: "new", at: Date.now() }],
     });
     for (const l of priced) {
       await ctx.db.insert("order_items", {
@@ -161,6 +160,9 @@ export const byPublicId = query({
     return {
       ref: order.ref,
       status: order.status,
+      history: order.history ?? [{ status: "new" as const, at: order._creationTime }],
+      courierName: order.status === "shipped" ? (order.courierName ?? null) : null,
+      trackingNumber: order.status === "shipped" ? (order.trackingNumber ?? null) : null,
       priceType: order.priceType,
       shippingMethod: order.shippingMethod,
       shippingFee: order.shippingFee,
