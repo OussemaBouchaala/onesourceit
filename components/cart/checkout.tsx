@@ -156,7 +156,7 @@ export function Checkout() {
                 <legend className="px-1.5 font-display text-lg font-bold">Mode de réception</legend>
                 {([
                   ["pickup", "Retrait au magasin", "Avenue des Martyrs, Sfax Médina", "Gratuit"],
-                  ["home", "Livraison à domicile", "Partout en Tunisie, sous [X] jours ouvrés", formatDT(priced?.deliveryFee)],
+                  ["home", "Livraison à domicile", "Partout en Tunisie, sous 2 à 5 jours ouvrés", formatDT(priced?.deliveryFee)],
                 ] as const).map(([value, label, hint, price]) => (
                   <label key={value} className={cn("flex cursor-pointer items-start gap-3 rounded-2xl border-[1.5px] p-4 has-disabled:cursor-not-allowed has-disabled:opacity-60", ship === value ? "border-cta bg-[#3a1a22]" : "border-line-strong")}>
                     <input type="radio" name="ship" value={value} checked={ship === value} disabled={value === "home" && priced?.deliveryFee === null} onChange={() => setShip(value)} className="mt-0.5 size-5 flex-none accent-cta" />
