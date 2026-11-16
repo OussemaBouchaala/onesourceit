@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
+import { TN_PHONE_PATTERN as PHONE_PATTERN } from "@/convex/rules";
 
-const PHONE_PATTERN = "^(\\+?216|00216)?[\\s.\\-]*(\\d[\\s.\\-]*){8}$";
 
 /** Admin access request. The account stays pending until the super admin approves it. */
 export function AdminSignUpForm() {
@@ -66,7 +66,7 @@ export function AdminSignUpForm() {
       <form onSubmit={onSubmit} className="flex flex-col gap-5 rounded-[20px] border border-line bg-card p-[clamp(20px,5vw,32px)]">
         <Label>Nom complet<Input name="fullName" required minLength={2} maxLength={120} autoComplete="name" /></Label>
         <Label>Email<Input name="email" type="email" required autoComplete="email" /></Label>
-        <Label>Téléphone<Input name="phone" type="tel" required inputMode="tel" pattern={PHONE_PATTERN} title="+216 suivi de 8 chiffres" placeholder="+216 __ ___ ___" autoComplete="tel" /></Label>
+        <Label>Téléphone<Input name="phone" type="tel" required inputMode="tel" pattern={PHONE_PATTERN} title="8 chiffres commençant par 2, 4, 5, 7 ou 9 (+216 facultatif)" placeholder="+216 __ ___ ___" autoComplete="tel" /></Label>
         <Label>Mot de passe<PasswordInput name="password" required minLength={8} autoComplete="new-password" /></Label>
         <Label>Confirmer le mot de passe<PasswordInput name="passwordConfirm" required minLength={8} autoComplete="new-password" /></Label>
         {error && <p role="alert" className="m-0 rounded-xl bg-bad-soft px-3.5 py-3 text-sm font-medium text-bad-ink">{error}</p>}

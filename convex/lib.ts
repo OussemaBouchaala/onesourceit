@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError } from "convex/values";
-import type { QueryCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { DEFAULT_DELIVERY_FEE } from "./rules";
 import type { Doc, Id } from "./_generated/dataModel";
 
 export type Viewer = {
@@ -59,12 +60,38 @@ export async function wholesalePriceFor(
   return row?.price ?? null;
 }
 
-export async function getSetting(ctx: QueryCtx, key: string) {
+/** A numeric setting (price in millimes, counter), or null when unset. */
+export async function getSetting(ctx: QueryCtx, key: string): Promise<number | null> {
   const row = await ctx.db
     .query("settings")
     .withIndex("by_key", (q) => q.eq("key", key))
     .unique();
-  return row?.value ?? null;
+  return typeof row?.value === "number" ? row.value : null;
+}
+
+/** A text setting (courier name, contact…), or "" when unset. */
+export async function getTextSetting(ctx: QueryCtx, key: string): Promise<string> {
+  const row = await ctx.db
+    .query("settings")
+    .withIndex("by_key", (q) => q.eq("key", key))
+    .unique();
+  return typeof row?.value === "string" ? row.value : "";
+}
+
+export async function setSetting(ctx: MutationCtx, key: string, value: number | string | null) {
+  const row = await ctx.db
+    .query("settings")
+    .withIndex("by_key", (q) => q.eq("key", key))
+    .unique();
+  if (row) await ctx.db.patch(row._id, { value });
+  else await ctx.db.insert("settings", { key, value });
+}
+
+/** Home-delivery pricing: the fee (7,000 DT until set) and the optional free-delivery threshold. */
+export async function getDeliveryPricing(ctx: QueryCtx) {
+  const fee = (await getSetting(ctx, "deliveryFee")) ?? DEFAULT_DELIVERY_FEE;
+  const freeFrom = await getSetting(ctx, "freeShippingFrom");
+  return { fee, freeFrom };
 }
 
 export async function variantLabel(ctx: QueryCtx, v: Doc<"variants">) {

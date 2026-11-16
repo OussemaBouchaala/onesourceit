@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
+import { TN_PHONE_PATTERN as PHONE_PATTERN } from "@/convex/rules";
 import { ACTIVITY_TYPES, GOVERNORATES } from "@/convex/rules";
 
-const PHONE_PATTERN = "^(\\+?216|00216)?[\\s.\\-]*(\\d[\\s.\\-]*){8}$";
 const legend = "mb-4 font-display text-xl font-bold";
 const grid = "m-0 grid grid-cols-[repeat(auto-fit,minmax(min(240px,100%),1fr))] gap-5 border-0 p-0";
 
@@ -84,8 +84,8 @@ export function SignUpForm() {
       <fieldset className={grid}>
         <legend className={legend}>Responsable</legend>
         <Label>Nom et prénom<Input name="fullName" required minLength={2} maxLength={120} autoComplete="name" /></Label>
-        <Label>Téléphone<Input name="phone" type="tel" required inputMode="tel" pattern={PHONE_PATTERN} title="+216 suivi de 8 chiffres" placeholder="+216 __ ___ ___" autoComplete="tel" /></Label>
-        <Label>WhatsApp<Input name="whatsapp" type="tel" inputMode="tel" pattern={PHONE_PATTERN} title="+216 suivi de 8 chiffres" placeholder="Si différent du téléphone" /></Label>
+        <Label>Téléphone<Input name="phone" type="tel" required inputMode="tel" pattern={PHONE_PATTERN} title="8 chiffres commençant par 2, 4, 5, 7 ou 9 (+216 facultatif)" placeholder="+216 __ ___ ___" autoComplete="tel" /></Label>
+        <Label>WhatsApp<Input name="whatsapp" type="tel" inputMode="tel" pattern={PHONE_PATTERN} title="8 chiffres commençant par 2, 4, 5, 7 ou 9 (+216 facultatif)" placeholder="Si différent du téléphone" /></Label>
         <Label>Email<Input name="email" type="email" required autoComplete="email" /></Label>
       </fieldset>
 

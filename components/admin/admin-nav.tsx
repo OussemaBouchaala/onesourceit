@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import {
+  Truck,
   ArrowLeft, Boxes, Camera, CircleHelp, ClipboardList, LayoutDashboard, LogOut, Menu, Store, Tags, Upload, Users, X,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
@@ -45,6 +46,7 @@ export function AdminNav() {
     { href: "/admin/produits", label: "Produits & stock", icon: Boxes, badge: 0 },
     { href: "/admin/photos", label: "Photos", icon: Camera, badge: 0 },
     { href: "/admin/import", label: "Import en masse", icon: Upload, badge: 0 },
+    { href: "/admin/livraison", label: "Livraison", icon: Truck, badge: 0 },
     ...(me?.isSuperAdmin ? [{ href: "/admin/equipe", label: "Équipe", icon: Users, badge: stats?.pendingAdmins ?? 0 }] : []),
   ];
   const isOn = (href: string) => (href === "/admin" ? pathname === "/admin" : pathname.startsWith(href));

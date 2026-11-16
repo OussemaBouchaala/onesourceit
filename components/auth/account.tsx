@@ -7,7 +7,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "@/convex/_generated/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ORDER_STATUS_LABEL, PROFILE_STATUS_LABEL, formatDT, formatDate, pieces } from "@/lib/format";
+import { ORDER_STATUS_CUSTOMER, PROFILE_STATUS_LABEL, formatDT, formatDate, pieces } from "@/lib/format";
 
 export function Account() {
   const me = useQuery(api.profiles.me);
@@ -71,7 +71,7 @@ export function Account() {
               <li key={o.publicId}>
                 <Link href={`/commande/${o.publicId}`} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-card p-4 text-ink no-underline hover:border-line-strong">
                   <span className="flex flex-col"><strong>#{o.ref}</strong><span className="text-sm text-muted">{formatDate(o.createdAt)} · {pieces(o.itemCount)}</span></span>
-                  <span className="flex items-center gap-3"><Badge>{ORDER_STATUS_LABEL[o.status]}</Badge><strong>{formatDT(o.total)}</strong></span>
+                  <span className="flex items-center gap-3"><Badge>{ORDER_STATUS_CUSTOMER[o.status]}</Badge><strong>{formatDT(o.total)}</strong></span>
                 </Link>
               </li>
             ))}

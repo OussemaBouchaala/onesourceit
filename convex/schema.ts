@@ -12,11 +12,15 @@ export const profileStatus = v.union(
   v.literal("approved"),
   v.literal("refused"),
 );
+// Cash-on-delivery lifecycle; see ORDER_STATUSES in rules.ts.
 export const orderStatus = v.union(
   v.literal("new"),
   v.literal("confirmed"),
+  v.literal("ready"),
   v.literal("shipped"),
   v.literal("delivered"),
+  v.literal("settled"),
+  v.literal("returned"),
   v.literal("cancelled"),
 );
 export const shippingMethod = v.union(v.literal("home"), v.literal("pickup"));
@@ -125,6 +129,15 @@ export default defineSchema({
     itemCount: v.number(),
     status: orderStatus,
     note: v.optional(v.string()),
+    // Cash to collect at delivery (= total). Missing on orders placed
+    // before the COD workflow: read it as total.
+    codAmount: v.optional(v.number()),
+    courierName: v.optional(v.string()),
+    trackingNumber: v.optional(v.string()),
+    confirmationNotes: v.optional(v.string()),
+    cancelReason: v.optional(v.string()),
+    // One entry per status change, oldest first.
+    timeline: v.optional(v.array(v.object({ status: orderStatus, at: v.number() }))),
   })
     .index("by_ref", ["ref"])
     .index("by_public_id", ["publicId"])
@@ -142,6 +155,7 @@ export default defineSchema({
   // Shop settings editable in admin: delivery fee, order counter.
   settings: defineTable({
     key: v.string(),
-    value: v.union(v.number(), v.null()),
+    // Numbers (prices in millimes, counters) or short texts (courier name…).
+    value: v.union(v.number(), v.string(), v.null()),
   }).index("by_key", ["key"]),
 });
