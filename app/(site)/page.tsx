@@ -83,7 +83,7 @@ export default function HomePage() {
           </h2>
           <ol className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-8 p-0">
             {[
-              ["01", "Créez votre compte", "Renseignez votre boutique, votre matricule fiscal et vos coordonnées."],
+              ["01", "Créez votre compte", "Renseignez votre boutique et vos coordonnées. Le matricule fiscal est facultatif."],
               ["02", "Validation par notre équipe", "Nous vérifions votre demande et activons votre accès revendeur."],
               ["03", "Commandez", "Choisissez marque, modèle et couleurs, puis validez votre panier. Paiement à la livraison."],
             ].map(([n, t, d]) => (

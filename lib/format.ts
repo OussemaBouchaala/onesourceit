@@ -30,6 +30,7 @@ export function formatDate(ms: number) {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
     timeZone: "Africa/Tunis",
   }).format(ms);
 }
@@ -61,3 +62,6 @@ export const CONTACT = {
   email: "contact@onesourceit.shop",
   mapsQuery: "Avenue des Martyrs, Sfax Médina, 3000 Sfax, Tunisie",
 };
+
+/** "1 pièce", "2 pièces". */
+export const pieces = (n: number) => `${n} pièce${n > 1 ? "s" : ""}`;
