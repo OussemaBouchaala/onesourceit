@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { formatDT } from "@/lib/format";
+import { formatDT, pieces } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   GOVERNORATES,
@@ -202,7 +202,7 @@ export function Checkout() {
 
         <aside aria-label="Récapitulatif" className="sticky top-24 flex min-w-0 flex-[1_1_300px] flex-col gap-3 rounded-[20px] border border-line bg-card p-[clamp(16px,4vw,24px)]">
           <strong className="font-display text-xl">Récapitulatif</strong>
-          <div className="flex justify-between text-[15px]"><span>Sous-total ({cart.count} pièces)</span><span>{formatDT(subtotal)}</span></div>
+          <div className="flex justify-between text-[15px]"><span>Sous-total ({pieces(cart.count)})</span><span>{formatDT(subtotal)}</span></div>
           <div className="flex justify-between text-[15px]"><span>Livraison</span><span>{step === 0 ? "Calculée à l'étape suivante" : ship === "pickup" ? "Gratuit" : formatDT(fee)}</span></div>
           <div className="flex items-baseline justify-between border-t border-line pt-3"><strong>Total</strong><strong className="font-display text-[26px]">{formatDT(step === 0 ? subtotal : total)}</strong></div>
           <span className="text-[13px] text-muted">{wholesale ? "Prix de gros revendeur" : "Prix détail TTC"} · paiement à la livraison</span>
@@ -216,7 +216,7 @@ export function Checkout() {
       {/* Phone: total and action pinned to the bottom of the screen */}
       <div className="sticky bottom-0 z-20 -mx-4 flex items-center justify-between gap-3 border-t border-line bg-card px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.2)] md:hidden">
         <div className="flex flex-col">
-          <span className="text-[13px] text-[#c9d2de]">Total · {cart.count} pièces</span>
+          <span className="text-[13px] text-[#c9d2de]">Total · {pieces(cart.count)}</span>
           <strong className="font-display text-[22px]">{formatDT(step === 0 ? subtotal : total)}</strong>
         </div>
         <div className="flex items-center gap-1">
