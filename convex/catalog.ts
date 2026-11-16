@@ -2,7 +2,7 @@ import { query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
-import { getViewer, wholesalePriceFor, getSetting, variantLabel, photoUrl } from "./lib";
+import { getViewer, wholesalePriceFor, getDeliveryPricing, getTextSetting, variantLabel, photoUrl } from "./lib";
 
 /** Brands with their model count, for the homepage. */
 export const brands = query({
@@ -97,7 +97,7 @@ export const priceCart = query({
   args: { variantIds: v.array(v.id("variants")) },
   handler: async (ctx, { variantIds }) => {
     const viewer = await getViewer(ctx);
-    const deliveryFee = await getSetting(ctx, "deliveryFee");
+    const { fee: deliveryFee, freeFrom } = await getDeliveryPricing(ctx);
     const lines = await Promise.all(
       variantIds.slice(0, 100).map(async (id) => {
         const variant = await ctx.db.get(id);
@@ -121,6 +121,8 @@ export const priceCart = query({
     return {
       priceType: viewer.isApproved ? ("wholesale" as const) : ("retail" as const),
       deliveryFee,
+      freeShippingFrom: freeFrom,
+      deliveryDelay: (await getTextSetting(ctx, "deliveryDelay")) || "2 à 5 jours ouvrés",
       lines: lines.filter((l) => l !== null),
     };
   },

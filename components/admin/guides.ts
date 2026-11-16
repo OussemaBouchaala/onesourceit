@@ -9,10 +9,16 @@ export const GUIDES: Record<string, GuideStep[]> = {
     { icon: "📷", title: "Photos et stock", text: "« Photos » vous guide pour photographier chaque couleur. « Produits & stock » sert aux prix et aux quantités." },
   ],
   "/admin/commandes": [
-    { icon: "🧾", title: "Vos commandes", text: "Chaque commande passée sur le site arrive ici. Le client paie à la livraison, en espèces." },
-    { icon: "📞", title: "Confirmez par téléphone", text: "Touchez le numéro pour appeler le client. Une fois d'accord, changez le statut en « Confirmée »." },
-    { icon: "🚚", title: "Suivez la livraison", text: "Passez ensuite à « Expédiée », puis « Livrée ». Si la commande est annulée, le stock est remis automatiquement." },
-    { icon: "🔎", title: "Voir le détail", text: "Touchez le numéro de commande pour voir les articles, l'adresse et la note du client." },
+    { icon: "🧾", title: "Vos commandes", text: "Chaque commande arrive dans « À confirmer ». Le client paie en espèces à la livraison ou au magasin." },
+    { icon: "💬", title: "Confirmez d'abord", text: "Touchez « WhatsApp » : le message avec les articles et le total est déjà écrit. Ou « Appeler ». Quand le client est d'accord, touchez « Confirmer »." },
+    { icon: "🚚", title: "Expédiez", text: "Dans « Confirmées », « CSV livreur » prépare la liste pour la société de livraison. « Expédier » demande le livreur et le numéro de suivi, que le client verra." },
+    { icon: "💰", title: "Encaissez", text: "« Livrée » quand le livreur a remis le colis, puis « Argent reçu du livreur » quand il vous a reversé l'argent. Les cartes en haut montrent l'argent encore chez le livreur." },
+    { icon: "↩️", title: "Annulation et retour", text: "« Annuler » avant l'envoi (motif obligatoire), « Retour » si le colis est refusé. Dans les deux cas, le stock est remis tout seul." },
+  ],
+  "/admin/livraison": [
+    { icon: "🚚", title: "Réglages de livraison", text: "Ici seulement les frais, le délai affiché et la société de livraison. Rien d'autre sur le site ne change." },
+    { icon: "💸", title: "Frais et livraison offerte", text: "Les frais s'ajoutent au panier pour la livraison à domicile. Laissez « offerte à partir de » vide pour ne jamais l'offrir." },
+    { icon: "📇", title: "Le livreur", text: "Son nom est proposé quand vous expédiez une commande. Ses coordonnées et vos notes restent internes." },
   ],
   "/admin/revendeurs": [
     { icon: "🏪", title: "Les revendeurs", text: "Les boutiques qui créent un compte arrivent ici « en attente ». Elles voient seulement le prix détail." },

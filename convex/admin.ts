@@ -2,17 +2,33 @@ import { action, internalQuery, mutation, query, type MutationCtx } from "./_gen
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 import { orderStatus, priceType, profileStatus } from "./schema";
+import { RESTOCK_STATUSES, nextStatuses, type OrderStatus } from "./rules";
 import {
   cloudinaryConfig,
   cloudinarySignature,
+  getDeliveryPricing,
   getSetting,
+  getTextSetting,
   photoPublicId,
   photoUrl,
   requireAdmin,
   requireSuperAdmin,
+  setSetting,
   variantLabel,
 } from "./lib";
+
+const ORDER_STATUS_FR: Record<OrderStatus, string> = {
+  new: "En attente de confirmation",
+  confirmed: "Confirmée",
+  ready: "Prête au retrait",
+  shipped: "Expédiée",
+  delivered: "Livrée",
+  settled: "Encaissée",
+  returned: "Retournée",
+  cancelled: "Annulée",
+};
 
 const price = v.union(v.number(), v.null());
 function checkPrice(p: number | null) {
@@ -34,7 +50,10 @@ export const dashboard = query({
       pendingResellers: pending.filter((p) => p.role === "reseller").length,
       approvedResellers: approved.filter((p) => p.role === "reseller").length,
       pendingAdmins: viewer.isSuperAdmin ? pending.filter((p) => p.role === "admin").length : 0,
-      deliveryFee: await getSetting(ctx, "deliveryFee"),
+      deliveryFee: (await getDeliveryPricing(ctx)).fee,
+      toShip: (
+        await ctx.db.query("orders").withIndex("by_status", (q) => q.eq("status", "confirmed")).collect()
+      ).length,
     };
   },
 });
@@ -52,11 +71,18 @@ export const orders = query({
           .order("desc")
           .take(200)
       : await ctx.db.query("orders").order("desc").take(200);
-    return rows
-      .filter((o) => !args.priceType || o.priceType === args.priceType)
-      .map((o) => ({
+    const kept = rows.filter((o) => !args.priceType || o.priceType === args.priceType);
+    const items = await Promise.all(
+      kept.map((o) =>
+        ctx.db.query("order_items").withIndex("by_order", (q) => q.eq("orderId", o._id)).collect(),
+      ),
+    );
+    return kept
+      .map((o, n) => ({
         _id: o._id,
         ref: o.ref,
+        publicId: o.publicId,
+        items: items[n].map((i) => ({ label: i.label, qty: i.qty, unitPrice: i.unitPrice })),
         createdAt: o._creationTime,
         customerName: o.customerName,
         phone: o.phone,
@@ -66,9 +92,17 @@ export const orders = query({
         note: o.note ?? null,
         priceType: o.priceType,
         itemCount: o.itemCount,
+        subtotal: o.subtotal,
+        shippingFee: o.shippingFee,
         total: o.total,
+        codAmount: o.codAmount ?? o.total,
         shippingMethod: o.shippingMethod,
         status: o.status,
+        courierName: o.courierName ?? null,
+        trackingNumber: o.trackingNumber ?? null,
+        confirmationNotes: o.confirmationNotes ?? null,
+        cancelReason: o.cancelReason ?? null,
+        next: nextStatuses(o.status, o.shippingMethod),
       }));
   },
 });
@@ -85,30 +119,127 @@ export const orderItems = query({
   },
 });
 
+const clean = (s: string | undefined, max: number) => s?.trim().slice(0, max) || undefined;
+
+/**
+ * Moves an order one step along the COD lifecycle (rules.ts). Only the
+ * allowed next steps are accepted. Cancelled and returned orders give
+ * their pieces back to the stock; dispatch needs the courier and its
+ * tracking number; a cancellation needs a reason.
+ */
 export const setOrderStatus = mutation({
-  args: { orderId: v.id("orders"), status: orderStatus },
-  handler: async (ctx, { orderId, status }) => {
+  args: {
+    orderId: v.id("orders"),
+    status: orderStatus,
+    cancelReason: v.optional(v.string()),
+    courierName: v.optional(v.string()),
+    trackingNumber: v.optional(v.string()),
+    confirmationNotes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    const order = await ctx.db.get(orderId);
+    const order = await ctx.db.get(args.orderId);
     if (!order) throw new ConvexError("Commande introuvable.");
-    if (order.status === status) return;
-    // Cancelling puts the pieces back in stock; un-cancelling takes them again.
-    const delta =
-      status === "cancelled" ? 1 : order.status === "cancelled" ? -1 : 0;
-    if (delta !== 0) {
+    if (order.status === args.status) return;
+    if (!nextStatuses(order.status, order.shippingMethod).includes(args.status))
+      throw new ConvexError(
+        `Impossible de passer de « ${ORDER_STATUS_FR[order.status]} » à « ${ORDER_STATUS_FR[args.status]} ».`,
+      );
+
+    const patch: Partial<Doc<"orders">> = { status: args.status };
+    if (args.status === "cancelled") {
+      const reason = clean(args.cancelReason, 300);
+      if (!reason) throw new ConvexError("Indiquez le motif de l'annulation.");
+      patch.cancelReason = reason;
+    }
+    if (args.status === "returned") patch.cancelReason = clean(args.cancelReason, 300);
+    if (args.status === "confirmed") patch.confirmationNotes = clean(args.confirmationNotes, 500);
+    if (args.status === "shipped") {
+      const courierName = clean(args.courierName, 80);
+      const trackingNumber = clean(args.trackingNumber, 80);
+      if (!courierName) throw new ConvexError("Indiquez le livreur.");
+      if (!trackingNumber) throw new ConvexError("Indiquez le numéro de suivi.");
+      patch.courierName = courierName;
+      patch.trackingNumber = trackingNumber;
+    }
+
+    if (RESTOCK_STATUSES.includes(args.status)) {
       const items = await ctx.db
         .query("order_items")
-        .withIndex("by_order", (q) => q.eq("orderId", orderId))
+        .withIndex("by_order", (q) => q.eq("orderId", order._id))
         .collect();
       for (const i of items) {
         const variant = await ctx.db.get(i.variantId);
-        if (!variant) continue;
-        const stock = variant.stock + delta * i.qty;
-        if (stock < 0) throw new ConvexError(`Stock insuffisant pour ${i.label}.`);
-        await ctx.db.patch(variant._id, { stock });
+        if (variant) await ctx.db.patch(variant._id, { stock: variant.stock + i.qty });
       }
     }
-    await ctx.db.patch(orderId, { status });
+
+    const timeline = order.timeline ?? [{ status: order.status, at: order._creationTime }];
+    patch.timeline = [...timeline, { status: args.status, at: Date.now() }];
+    await ctx.db.patch(order._id, patch);
+  },
+});
+
+/**
+ * Cash-on-delivery money: what the courier still holds (delivered, not
+ * yet transferred), what has been transferred, and the return rate of
+ * home deliveries that reached an end (delivered, settled or returned).
+ */
+export const codSummary = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    const [delivered, settled, returned, shipped] = await Promise.all(
+      (["delivered", "settled", "returned", "shipped"] as const).map((status) =>
+        ctx.db.query("orders").withIndex("by_status", (q) => q.eq("status", status)).collect(),
+      ),
+    );
+    const home = (rows: Doc<"orders">[]) => rows.filter((o) => o.shippingMethod === "home");
+    const sum = (rows: Doc<"orders">[]) => rows.reduce((a, o) => a + (o.codAmount ?? o.total), 0);
+    const ended = home(delivered).length + home(settled).length + home(returned).length;
+    return {
+      withCourier: sum(home(delivered)),
+      withCourierCount: home(delivered).length,
+      inTransit: sum(home(shipped)),
+      inTransitCount: home(shipped).length,
+      settled: sum(home(settled)),
+      settledCount: home(settled).length,
+      returnRate: ended === 0 ? null : home(returned).length / ended,
+      returnedCount: home(returned).length,
+    };
+  },
+});
+
+/** Confirmed home deliveries, one row each, for the courier CSV. */
+export const courierExport = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    const rows = await ctx.db
+      .query("orders")
+      .withIndex("by_status", (q) => q.eq("status", "confirmed"))
+      .order("asc")
+      .collect();
+    return Promise.all(
+      rows
+        .filter((o) => o.shippingMethod === "home")
+        .map(async (o) => {
+          const items = await ctx.db
+            .query("order_items")
+            .withIndex("by_order", (q) => q.eq("orderId", o._id))
+            .collect();
+          return {
+            ref: o.ref,
+            customerName: o.customerName,
+            phone: o.phone,
+            governorate: o.governorate ?? "",
+            city: o.city ?? "",
+            address: o.address ?? "",
+            summary: items.map((i) => `${i.qty} x ${i.label}`).join(" | "),
+            codAmount: o.codAmount ?? o.total,
+          };
+        }),
+    );
   },
 });
 
@@ -339,12 +470,42 @@ export const setDeliveryFee = mutation({
   handler: async (ctx, { fee }) => {
     await requireAdmin(ctx);
     checkPrice(fee);
-    const row = await ctx.db
-      .query("settings")
-      .withIndex("by_key", (q) => q.eq("key", "deliveryFee"))
-      .unique();
-    if (row) await ctx.db.patch(row._id, { value: fee });
-    else await ctx.db.insert("settings", { key: "deliveryFee", value: fee });
+    await setSetting(ctx, "deliveryFee", fee);
+  },
+});
+
+const COURIER_KEYS = ["courierName", "courierPhone", "courierEmail", "courierNotes", "deliveryDelay"] as const;
+
+/** Everything on the admin "Livraison" page. */
+export const deliverySettings = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    const { fee, freeFrom } = await getDeliveryPricing(ctx);
+    const text = Object.fromEntries(
+      await Promise.all(COURIER_KEYS.map(async (k) => [k, await getTextSetting(ctx, k)] as const)),
+    ) as Record<(typeof COURIER_KEYS)[number], string>;
+    return { fee, freeFrom, feeIsDefault: (await getSetting(ctx, "deliveryFee")) === null, ...text };
+  },
+});
+
+export const setDeliverySettings = mutation({
+  args: {
+    fee: v.number(),
+    freeFrom: price,
+    courierName: v.string(),
+    courierPhone: v.string(),
+    courierEmail: v.string(),
+    courierNotes: v.string(),
+    deliveryDelay: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    checkPrice(args.fee);
+    checkPrice(args.freeFrom);
+    await setSetting(ctx, "deliveryFee", args.fee);
+    await setSetting(ctx, "freeShippingFrom", args.freeFrom);
+    for (const k of COURIER_KEYS) await setSetting(ctx, k, args[k].trim().slice(0, k === "courierNotes" ? 500 : 120));
   },
 });
 

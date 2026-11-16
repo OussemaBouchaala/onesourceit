@@ -6,7 +6,8 @@ import { Check } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Steps } from "./steps";
 import { Button } from "@/components/ui/button";
-import { ORDER_STATUS_LABEL, formatDT, formatDate, whatsappLink } from "@/lib/format";
+import { ORDER_STATUS_CUSTOMER, formatDT, formatDate, whatsappLink } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export function OrderConfirmation({ publicId }: { publicId: string }) {
   const order = useQuery(api.orders.byPublicId, { publicId });
@@ -45,7 +46,8 @@ export function OrderConfirmation({ publicId }: { publicId: string }) {
               <span>{formatDT(order.total)}</span>
             </li>
           </ul>
-          <p className="m-0 text-sm text-muted">Statut : {ORDER_STATUS_LABEL[order.status]}. Gardez ce lien pour suivre votre commande.</p>
+          <OrderTimeline order={order} />
+          <p className="m-0 text-sm text-muted">Gardez ce lien pour suivre votre commande.</p>
           <div className="flex w-full flex-wrap gap-2.5">
             <Button asChild variant="success" className="flex-[1_1_220px]">
               <a href={whatsappLink(`Bonjour, je vous contacte au sujet de ma commande #${order.ref}.`)} target="_blank" rel="noopener noreferrer">
@@ -59,5 +61,50 @@ export function OrderConfirmation({ publicId }: { publicId: string }) {
         </div>
       )}
     </main>
+  );
+}
+
+type Order = NonNullable<ReturnType<typeof useQuery<typeof api.orders.byPublicId>>>;
+
+/** Where the order is: the usual steps, or how it ended (cancelled, returned). */
+function OrderTimeline({ order }: { order: Order }) {
+  const steps =
+    order.shippingMethod === "home"
+      ? (["new", "confirmed", "shipped", "delivered"] as const)
+      : (["new", "confirmed", "ready", "delivered"] as const);
+  const at = new Map<string, number>(order.timeline.map((e) => [e.status, e.at]));
+  if (order.status === "settled" && !at.has("delivered")) at.set("delivered", order.timeline.at(-1)!.at);
+  const ended = order.status === "cancelled" || order.status === "returned";
+
+  return (
+    <div className="flex w-full flex-col gap-3 border-t border-line pt-4">
+      <strong>Suivi : {ORDER_STATUS_CUSTOMER[order.status]}</strong>
+      {ended ? (
+        <p className="m-0 rounded-xl bg-bad-soft px-3.5 py-3 text-sm text-bad-ink">
+          {order.status === "cancelled" ? "Cette commande a été annulée." : "Ce colis nous a été retourné."} Contactez-nous sur WhatsApp pour toute question.
+        </p>
+      ) : (
+        <ol className="m-0 flex list-none flex-col gap-0 p-0">
+          {steps.map((s, i) => {
+            const done = at.has(s);
+            return (
+              <li key={s} className="flex gap-3">
+                <span className="flex flex-col items-center">
+                  <span className={cn("mt-1 size-3.5 rounded-full border-2", done ? "border-ok bg-ok" : "border-line-strong")} aria-hidden />
+                  {i < steps.length - 1 && <span className={cn("w-0.5 flex-1", done && at.has(steps[i + 1]) ? "bg-ok" : "bg-line")} aria-hidden />}
+                </span>
+                <span className="flex flex-col pb-3">
+                  <span className={done ? "font-semibold" : "text-muted"}>{ORDER_STATUS_CUSTOMER[s]}</span>
+                  {done && <span className="text-[13px] text-muted">{formatDate(at.get(s)!)}</span>}
+                  {s === "shipped" && done && order.trackingNumber && (
+                    <span className="text-[13px] text-soft">{order.courierName} · suivi n° <strong>{order.trackingNumber}</strong></span>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </div>
   );
 }

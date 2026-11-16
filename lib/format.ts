@@ -35,13 +35,38 @@ export function formatDate(ms: number) {
   }).format(ms);
 }
 
+/** Cash-on-delivery lifecycle labels, in lifecycle order (see convex/rules.ts). */
 export const ORDER_STATUS_LABEL = {
-  new: "Nouvelle",
+  new: "À confirmer",
   confirmed: "Confirmée",
+  ready: "Prête au retrait",
   shipped: "Expédiée",
   delivered: "Livrée",
+  settled: "Encaissée",
+  returned: "Retournée",
   cancelled: "Annulée",
 } as const;
+
+/** Wording for the customer, who doesn't care about courier settlement. */
+export const ORDER_STATUS_CUSTOMER = {
+  new: "En attente de confirmation",
+  confirmed: "Confirmée",
+  ready: "Prête au retrait",
+  shipped: "Expédiée",
+  delivered: "Livrée",
+  settled: "Livrée",
+  returned: "Retournée",
+  cancelled: "Annulée",
+} as const;
+
+/** WhatsApp chat with a customer, from a stored "+216XXXXXXXX" number. */
+export function customerWhatsapp(phone: string, text: string) {
+  return `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;
+}
+
+/** "+21698123456" → "98 123 456". */
+export const localPhone = (phone: string) =>
+  phone.replace(/^\+216/, "").replace(/^(\d{2})(\d{3})(\d{3})$/, "$1 $2 $3");
 
 export const PROFILE_STATUS_LABEL = {
   pending: "En attente",

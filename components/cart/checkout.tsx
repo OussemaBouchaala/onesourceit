@@ -20,6 +20,8 @@ import {
   MAX_RETAIL_QTY,
   WHOLESALE_MIN_QTY,
   WHOLESALE_STEP,
+  TN_PHONE_PATTERN,
+  deliveryFeeFor,
   isValidWholesaleQty,
 } from "@/convex/rules";
 
@@ -42,7 +44,9 @@ export function Checkout() {
   const subtotal = anyMissingPrice
     ? null
     : rows.reduce((a, r) => a + (r.info?.unitPrice ?? 0) * r.qty, 0);
-  const fee = ship === "home" ? (priced?.deliveryFee ?? null) : 0;
+  const homeFee =
+    priced && subtotal !== null ? deliveryFeeFor(subtotal, priced.deliveryFee, priced.freeShippingFrom) : null;
+  const fee = ship === "home" ? homeFee : 0;
   const total = subtotal === null || fee === null ? null : subtotal + fee;
   const badQty = wholesale && rows.some((r) => !isValidWholesaleQty(r.qty));
   const unavailable = rows.some((r) => r.info && !r.info.available);
@@ -156,11 +160,18 @@ export function Checkout() {
                 <legend className="px-1.5 font-display text-lg font-bold">Mode de réception</legend>
                 {([
                   ["pickup", "Retrait au magasin", "Avenue des Martyrs, Sfax Médina", "Gratuit"],
-                  ["home", "Livraison à domicile", "Partout en Tunisie, sous 2 à 5 jours ouvrés", formatDT(priced?.deliveryFee)],
+                  [
+                    "home",
+                    "Livraison à domicile",
+                    `Partout en Tunisie, sous ${priced?.deliveryDelay ?? "2 à 5 jours ouvrés"}${
+                      priced?.freeShippingFrom != null && homeFee !== 0 ? ` · offerte dès ${formatDT(priced.freeShippingFrom)}` : ""
+                    }`,
+                    homeFee === 0 ? "Offerte" : formatDT(homeFee),
+                  ],
                 ] as const).map(([value, label, hint, price]) => (
                   <label key={value} className={cn("flex cursor-pointer items-start gap-3 rounded-2xl border-[1.5px] p-4 has-disabled:cursor-not-allowed has-disabled:opacity-60", ship === value ? "border-cta bg-[#3a1a22]" : "border-line-strong")}>
-                    <input type="radio" name="ship" value={value} checked={ship === value} disabled={value === "home" && priced?.deliveryFee === null} onChange={() => setShip(value)} className="mt-0.5 size-5 flex-none accent-cta" />
-                    <span className="flex flex-1 flex-col gap-0.5"><strong>{label}</strong><span className="text-sm text-muted">{value === "home" && priced?.deliveryFee === null ? "Bientôt disponible : frais de livraison à définir" : hint}</span></span>
+                    <input type="radio" name="ship" value={value} checked={ship === value} onChange={() => setShip(value)} className="mt-0.5 size-5 flex-none accent-cta" />
+                    <span className="flex flex-1 flex-col gap-0.5"><strong>{label}</strong><span className="text-sm text-muted">{hint}</span></span>
                     <strong className="text-[15px]">{price}</strong>
                   </label>
                 ))}
@@ -169,7 +180,7 @@ export function Checkout() {
               <fieldset className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] gap-4 rounded-[20px] border border-line bg-card p-[clamp(16px,4vw,24px)]">
                 <legend className="px-1.5 font-display text-lg font-bold">Vos coordonnées</legend>
                 <Label>Nom et prénom<Input name="customerName" required minLength={2} maxLength={120} autoComplete="name" /></Label>
-                <Label>Téléphone<Input name="phone" type="tel" required inputMode="tel" placeholder="+216 __ ___ ___" autoComplete="tel" pattern="^(\+?216|00216)?[\s.\-]*(\d[\s.\-]*){8}$" title="+216 suivi de 8 chiffres" /></Label>
+                <Label>Téléphone<Input name="phone" type="tel" required inputMode="tel" placeholder="+216 __ ___ ___" autoComplete="tel" pattern={TN_PHONE_PATTERN} title="8 chiffres commençant par 2, 4, 5, 7 ou 9 (+216 facultatif)" /></Label>
                 {ship === "home" && (
                   <>
                     <Label>Gouvernorat
@@ -192,7 +203,7 @@ export function Checkout() {
                 <Banknote aria-hidden className="size-6 flex-none text-[#5fd3a8]" />
                 <div className="flex flex-col gap-0.5">
                   <strong>Paiement à la réception</strong>
-                  <span className="text-sm text-muted">En espèces au livreur ou au magasin. Nous vous appelons pour confirmer avant l&apos;envoi.</span>
+                  <span className="text-sm text-muted">Seul mode de paiement : en espèces au livreur ou au magasin. Nous vous appelons ou vous écrivons sur WhatsApp pour confirmer avant l&apos;envoi.</span>
                 </div>
               </div>
               {error && <p role="alert" className="m-0 rounded-xl bg-bad-soft px-3.5 py-3 text-sm font-medium text-bad-ink">{error}</p>}
@@ -203,7 +214,7 @@ export function Checkout() {
         <aside aria-label="Récapitulatif" className="sticky top-24 flex min-w-0 flex-[1_1_300px] flex-col gap-3 rounded-[20px] border border-line bg-card p-[clamp(16px,4vw,24px)]">
           <strong className="font-display text-xl">Récapitulatif</strong>
           <div className="flex justify-between text-[15px]"><span>Sous-total ({pieces(cart.count)})</span><span>{formatDT(subtotal)}</span></div>
-          <div className="flex justify-between text-[15px]"><span>Livraison</span><span>{step === 0 ? "Calculée à l'étape suivante" : ship === "pickup" ? "Gratuit" : formatDT(fee)}</span></div>
+          <div className="flex justify-between text-[15px]"><span>Livraison</span><span>{step === 0 ? "Calculée à l'étape suivante" : ship === "pickup" ? "Gratuit" : fee === 0 ? "Offerte" : formatDT(fee)}</span></div>
           <div className="flex items-baseline justify-between border-t border-line pt-3"><strong>Total</strong><strong className="font-display text-[26px]">{formatDT(step === 0 ? subtotal : total)}</strong></div>
           <span className="text-[13px] text-muted">{wholesale ? "Prix de gros revendeur" : "Prix détail TTC"} · paiement à la livraison</span>
           <div className="mt-1 hidden flex-col gap-2.5 md:flex">

@@ -106,14 +106,15 @@ describe("placeOrder", () => {
     expect((await t.query(api.orders.byPublicId, { publicId }))!.total).toBe(60000);
   });
 
-  test("home delivery is refused while the fee is not set, then charged", async () => {
+  test("home delivery costs 7 DT by default, then the admin's fee", async () => {
     const { t, variant } = await setup();
     const home = { ...order(variant._id, 1), shippingMethod: "home" as const, governorate: "Sfax", city: "Sfax", address: "Rue de test 1" };
-    await expect(t.mutation(api.orders.placeOrder, home)).rejects.toThrow(/frais de livraison/i);
+    const first = await t.mutation(api.orders.placeOrder, home);
+    expect((await t.query(api.orders.byPublicId, { publicId: first.publicId }))!.total).toBe(27000);
     const admin = await userWith(t, "admin", "approved");
-    await admin.mutation(api.admin.setDeliveryFee, { fee: 7000 });
+    await admin.mutation(api.admin.setDeliveryFee, { fee: 8000 });
     const { publicId } = await t.mutation(api.orders.placeOrder, home);
-    expect((await t.query(api.orders.byPublicId, { publicId }))!.total).toBe(27000);
+    expect((await t.query(api.orders.byPublicId, { publicId }))!.total).toBe(28000);
   });
 
   test("stock and phone are checked", async () => {
@@ -128,8 +129,109 @@ describe("placeOrder", () => {
     await t.mutation(api.orders.placeOrder, order(variant._id, 4));
     const admin = await userWith(t, "admin", "approved");
     const [o] = await admin.query(api.admin.orders, {});
-    await admin.mutation(api.admin.setOrderStatus, { orderId: o._id, status: "cancelled" });
+    await expect(admin.mutation(api.admin.setOrderStatus, { orderId: o._id, status: "cancelled" })).rejects.toThrow(/motif/);
+    await admin.mutation(api.admin.setOrderStatus, { orderId: o._id, status: "cancelled", cancelReason: "Client injoignable" });
     expect((await t.run((ctx) => ctx.db.get(variant._id)))!.stock).toBe(variant.stock);
+  });
+});
+
+describe("cash-on-delivery lifecycle", () => {
+  const home = (variantId: Id<"variants">, qty: number) => ({
+    ...order(variantId, qty),
+    shippingMethod: "home" as const,
+    governorate: "Sfax",
+    city: "Sfax",
+    address: "Rue de test 1",
+  });
+
+  test("phone: 8 digits starting with 2, 4, 5, 7 or 9, +216 optional", async () => {
+    const { t, variant } = await setup();
+    for (const bad of ["31 234 567", "12345678", "+216 2123456", "+33 6 12 34 56 78"])
+      await expect(t.mutation(api.orders.placeOrder, { ...order(variant._id, 1), phone: bad })).rejects.toThrow(/Téléphone/);
+    for (const ok of ["98 123 456", "+216 55 123 456", "0021671123456", "41.123.456"])
+      await t.mutation(api.orders.placeOrder, { ...order(variant._id, 1), phone: ok });
+    const admin = await userWith(t, "admin", "approved");
+    expect((await admin.query(api.admin.orders, {})).map((o) => o.phone).sort()).toEqual(
+      ["+21641123456", "+21655123456", "+21671123456", "+21698123456"],
+    );
+  });
+
+  test("free delivery from the threshold up", async () => {
+    const { t, variant } = await setup();
+    const admin = await userWith(t, "admin", "approved");
+    await admin.mutation(api.admin.setDeliverySettings, {
+      fee: 7000, freeFrom: 60000, courierName: "", courierPhone: "", courierEmail: "", courierNotes: "", deliveryDelay: "",
+    });
+    const small = await t.mutation(api.orders.placeOrder, home(variant._id, 2)); // 40 DT
+    const big = await t.mutation(api.orders.placeOrder, home(variant._id, 3)); // 60 DT
+    expect((await t.query(api.orders.byPublicId, { publicId: small.publicId }))!.shippingFee).toBe(7000);
+    expect((await t.query(api.orders.byPublicId, { publicId: big.publicId }))!.shippingFee).toBe(0);
+  });
+
+  test("home delivery: confirm, dispatch with tracking, deliver, settle", async () => {
+    const { t, variant } = await setup();
+    const { publicId } = await t.mutation(api.orders.placeOrder, home(variant._id, 2));
+    const admin = await userWith(t, "admin", "approved");
+    const [o] = await admin.query(api.admin.orders, {});
+    expect(o.status).toBe("new");
+    expect(o.codAmount).toBe(47000);
+    expect(o.next).toEqual(["confirmed", "cancelled"]);
+    const set = (status: "confirmed" | "shipped" | "delivered" | "settled" | "ready", extra = {}) =>
+      admin.mutation(api.admin.setOrderStatus, { orderId: o._id, status, ...extra });
+    await expect(set("delivered")).rejects.toThrow(/Impossible/);
+    await expect(set("ready")).rejects.toThrow(/Impossible/); // pickup only
+    await set("confirmed", { confirmationNotes: "Confirmé par WhatsApp" });
+    expect((await admin.query(api.admin.courierExport, {})).map((r) => r.ref)).toEqual([o.ref]);
+    await expect(set("shipped", { courierName: "Navex" })).rejects.toThrow(/suivi/);
+    await set("shipped", { courierName: "Navex", trackingNumber: "NVX123" });
+    await expect(set("settled")).rejects.toThrow(/Impossible/);
+    await set("delivered");
+    let cod = await admin.query(api.admin.codSummary, {});
+    expect(cod.withCourier).toBe(47000);
+    await set("settled");
+    cod = await admin.query(api.admin.codSummary, {});
+    expect([cod.withCourier, cod.settled, cod.returnRate]).toEqual([0, 47000, 0]);
+    const page = (await t.query(api.orders.byPublicId, { publicId }))!;
+    expect(page.trackingNumber).toBe("NVX123");
+    expect(page.timeline.map((e) => e.status)).toEqual(["new", "confirmed", "shipped", "delivered", "settled"]);
+  });
+
+  test("a returned parcel puts the stock back and counts in the return rate", async () => {
+    const { t, variant } = await setup();
+    await t.mutation(api.orders.placeOrder, home(variant._id, 3));
+    const admin = await userWith(t, "admin", "approved");
+    const [o] = await admin.query(api.admin.orders, {});
+    await admin.mutation(api.admin.setOrderStatus, { orderId: o._id, status: "confirmed" });
+    await admin.mutation(api.admin.setOrderStatus, { orderId: o._id, status: "shipped", courierName: "Intigo", trackingNumber: "IT9" });
+    await expect(admin.mutation(api.admin.setOrderStatus, { orderId: o._id, status: "cancelled", cancelReason: "x" })).rejects.toThrow(/Impossible/);
+    await admin.mutation(api.admin.setOrderStatus, { orderId: o._id, status: "returned", cancelReason: "Refusé à la porte" });
+    expect((await t.run((ctx) => ctx.db.get(variant._id)))!.stock).toBe(variant.stock);
+    expect((await admin.query(api.admin.codSummary, {})).returnRate).toBe(1);
+  });
+
+  test("store pickup: confirmed, ready, delivered; never settled or shipped", async () => {
+    const { t, variant } = await setup();
+    await t.mutation(api.orders.placeOrder, order(variant._id, 1));
+    const admin = await userWith(t, "admin", "approved");
+    const [o] = await admin.query(api.admin.orders, {});
+    await admin.mutation(api.admin.setOrderStatus, { orderId: o._id, status: "confirmed" });
+    await expect(admin.mutation(api.admin.setOrderStatus, { orderId: o._id, status: "shipped", courierName: "x", trackingNumber: "y" })).rejects.toThrow(/Impossible/);
+    await admin.mutation(api.admin.setOrderStatus, { orderId: o._id, status: "ready" });
+    await admin.mutation(api.admin.setOrderStatus, { orderId: o._id, status: "delivered" });
+    const [after] = await admin.query(api.admin.orders, {});
+    expect(after.next).toEqual([]);
+    expect(await admin.query(api.admin.courierExport, {})).toEqual([]);
+  });
+
+  test("only admins move orders or read the cash summary", async () => {
+    const { t, variant } = await setup();
+    await t.mutation(api.orders.placeOrder, order(variant._id, 1));
+    const admin = await userWith(t, "admin", "approved");
+    const [o] = await admin.query(api.admin.orders, {});
+    const reseller = await userWith(t, "reseller", "approved");
+    await expect(reseller.mutation(api.admin.setOrderStatus, { orderId: o._id, status: "confirmed" })).rejects.toThrow(/administration/);
+    await expect(t.query(api.admin.codSummary, {})).rejects.toThrow(/administration/);
+    await expect(reseller.query(api.admin.deliverySettings, {})).rejects.toThrow(/administration/);
   });
 });
 
